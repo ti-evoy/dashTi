@@ -1,3 +1,11 @@
+token_valido = st.secrets.get("TOKEN_ACESSO", "")
+token_url    = st.query_params.get("token", "")
+
+if token_url != token_valido:
+    st.set_page_config(page_title="Acesso Restrito", page_icon="🔒")
+    st.error("🔒 Acesso não autorizado.")
+    st.stop()
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
