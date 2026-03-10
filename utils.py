@@ -1,10 +1,26 @@
 import pandas as pd
 import os
+import json
+import gspread
+from google.oauth2.service_account import Credentials
 from datetime import datetime, date, timedelta
+import streamlit as st
 
-ARQUIVO         = "data/projetos.xlsx"
-ARQUIVO_REUNIOES= "data/reunioes.xlsx"
-ARQUIVO_SPRINT  = "data/sprints_db.xlsx"
+# ── Google Sheets config ──────────────────────────────────────────────────────
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
+
+# Nomes das abas na planilha Google Sheets
+ABA_PROJETOS  = "projetos"
+ABA_REUNIOES  = "reunioes"
+ABA_SPRINTS   = "sprints"
+
+# Fallback local (desenvolvimento sem internet)
+ARQUIVO_LOCAL_PROJETOS  = "data/projetos.xlsx"
+ARQUIVO_LOCAL_REUNIOES  = "data/reunioes.xlsx"
+ARQUIVO_LOCAL_SPRINTS   = "data/sprints_db.xlsx"
 
 # ── Checkboxes de progresso ───────────────────────────────────────────────────
 ETAPAS_PROJETO = [
@@ -18,68 +34,91 @@ ETAPAS_PROJETO = [
     "Encerramento e lições aprendidas",
 ]
 
-# BUs válidas — fonte única da verdade
-BUS_VALIDAS = [
-    "Estratégia & Projetos",
-    "Governança & Sustentação",
-]
+BUS_VALIDAS = ["Estratégia & Projetos", "Governança & Sustentação"]
 
 _BU_MAPA = {
-    "projetos":      "Estratégia & Projetos",
-    "estrategia":    "Estratégia & Projetos",
-    "estratégia":    "Estratégia & Projetos",
-    "governanca":    "Governança & Sustentação",
-    "governança":    "Governança & Sustentação",
-    "sustentacao":   "Governança & Sustentação",
-    "sustentação":   "Governança & Sustentação",
+    "projetos":    "Estratégia & Projetos",
+    "estrategia":  "Estratégia & Projetos",
+    "estratégia":  "Estratégia & Projetos",
+    "governanca":  "Governança & Sustentação",
+    "governança":  "Governança & Sustentação",
+    "sustentacao": "Governança & Sustentação",
+    "sustentação": "Governança & Sustentação",
 }
 
 def _normalizar_bu(bu):
-    if pd.isna(bu):
-        return bu
+    if pd.isna(bu): return bu
     bu_str = str(bu).strip()
-    if bu_str in BUS_VALIDAS:
-        return bu_str
-    bu_lower = bu_str.lower()
+    if bu_str in BUS_VALIDAS: return bu_str
     for chave, valor in _BU_MAPA.items():
-        if chave in bu_lower:
-            return valor
+        if chave in bu_str.lower(): return valor
     return bu_str
 
 def calcular_progresso(etapas_concluidas):
-    total = len(ETAPAS_PROJETO)
-    feitas = sum(etapas_concluidas)
-    return round((feitas / total) * 100)
+    return round((sum(etapas_concluidas) / len(ETAPAS_PROJETO)) * 100)
+
+# ── Conexão Google Sheets ─────────────────────────────────────────────────────
+@st.cache_resource
+def _get_client():
+    """Retorna cliente gspread autenticado via st.secrets."""
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    return gspread.authorize(creds)
+
+def _get_sheet(aba: str):
+    """Retorna worksheet pelo nome da aba."""
+    client = _get_client()
+    sheet_id = st.secrets["SHEET_ID"]
+    sh = client.open_by_key(sheet_id)
+    return sh.worksheet(aba)
+
+def _ler_aba(aba: str) -> pd.DataFrame:
+    """Lê uma aba e retorna DataFrame."""
+    ws = _get_sheet(aba)
+    data = ws.get_all_records()
+    return pd.DataFrame(data) if data else pd.DataFrame()
+
+def _salvar_aba(aba: str, df: pd.DataFrame):
+    """Sobrescreve a aba inteira com o DataFrame."""
+    ws = _get_sheet(aba)
+    df2 = df.copy()
+    # Converte datas para string para evitar problemas de serialização
+    for col in df2.columns:
+        if pd.api.types.is_datetime64_any_dtype(df2[col]):
+            df2[col] = df2[col].dt.strftime("%Y-%m-%d").fillna("")
+    df2 = df2.fillna("").astype(str)
+    ws.clear()
+    ws.update([df2.columns.tolist()] + df2.values.tolist())
 
 # ── Projetos ──────────────────────────────────────────────────────────────────
-def carregar_dados():
-    os.makedirs("data", exist_ok=True)
-    if not os.path.exists(ARQUIVO):
-        df = pd.DataFrame(columns=[
-            "Projeto", "Responsável", "Prioridade", "Status", "Progresso (%)",
-            "Etapas", "Início", "Prazo", "Horas Gastas", "Descrição"
-        ])
-        df.to_excel(ARQUIVO, index=False)
-        return df
-    df = pd.read_excel(ARQUIVO)
-    for col in ["Início", "Prazo"]:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
-    if "Progresso (%)" in df.columns:
-        df["Progresso (%)"] = pd.to_numeric(df["Progresso (%)"], errors="coerce").fillna(0)
-    if "Prioridade" not in df.columns:
-        df["Prioridade"] = "Média"
-    if "Etapas" not in df.columns:
-        df["Etapas"] = ""
-    return df
-
-def salvar_projeto(novo):
-    df = carregar_dados()
-    df = pd.concat([df, pd.DataFrame([novo])], ignore_index=True)
+def carregar_dados() -> pd.DataFrame:
     try:
-        df.to_excel(ARQUIVO, index=False)
-    except PermissionError:
-        raise PermissionError("❌ Feche o arquivo 'projetos.xlsx' no Excel e tente novamente.")
+        df = _ler_aba(ABA_PROJETOS)
+        if df.empty:
+            return pd.DataFrame(columns=[
+                "Projeto","Responsável","Prioridade","Status","Progresso (%)",
+                "Etapas","Início","Prazo","Horas Gastas","Descrição"
+            ])
+        for col in ["Início","Prazo"]:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+        if "Progresso (%)" in df.columns:
+            df["Progresso (%)"] = pd.to_numeric(df["Progresso (%)"], errors="coerce").fillna(0)
+        if "Prioridade" not in df.columns: df["Prioridade"] = "Média"
+        if "Etapas"     not in df.columns: df["Etapas"] = ""
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar projetos: {e}")
+        return pd.DataFrame()
+
+def salvar_projeto(novo: dict):
+    df = carregar_dados()
+    novo_formatado = novo.copy()
+    for col in ["Início","Prazo"]:
+        if col in novo_formatado and hasattr(novo_formatado[col], 'strftime'):
+            novo_formatado[col] = novo_formatado[col].strftime("%Y-%m-%d")
+    df = pd.concat([df, pd.DataFrame([novo_formatado])], ignore_index=True)
+    _salvar_aba(ABA_PROJETOS, df)
 
 def atualizar_etapas(idx, etapas):
     df = carregar_dados()
@@ -89,20 +128,16 @@ def atualizar_etapas(idx, etapas):
     df.at[idx, "Progresso (%)"] = progresso
     if progresso == 100:
         df.at[idx, "Status"] = "Concluído"
-    try:
-        df.to_excel(ARQUIVO, index=False)
-    except PermissionError:
-        raise PermissionError("❌ Feche o arquivo 'projetos.xlsx' no Excel e tente novamente.")
+    _salvar_aba(ABA_PROJETOS, df)
 
 def get_etapas(row):
-    val = str(row.get("Etapas", ""))
+    val = str(row.get("Etapas",""))
     if val and val != "nan":
         bits   = val.split(",")
-        result = [b.strip() == "1" for b in bits]
-        while len(result) < len(ETAPAS_PROJETO):
-            result.append(False)
+        result = [b.strip()=="1" for b in bits]
+        while len(result) < len(ETAPAS_PROJETO): result.append(False)
         return result[:len(ETAPAS_PROJETO)]
-    return [False] * len(ETAPAS_PROJETO)
+    return [False]*len(ETAPAS_PROJETO)
 
 def projetos_atrasados(df):
     hoje = pd.Timestamp(datetime.today().date())
@@ -110,36 +145,33 @@ def projetos_atrasados(df):
     return df[mask]
 
 # ── Reuniões ──────────────────────────────────────────────────────────────────
-def carregar_reunioes():
-    os.makedirs("data", exist_ok=True)
-    if not os.path.exists(ARQUIVO_REUNIOES):
-        df = pd.DataFrame(columns=[
-            "Título", "Responsável", "Participantes", "Empresa",
-            "Data", "Horário", "Local", "Observações"
-        ])
-        df.to_excel(ARQUIVO_REUNIOES, index=False)
-        return df
-    df = pd.read_excel(ARQUIVO_REUNIOES)
-    if "Data" in df.columns:
-        df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
-    df = df.reset_index(drop=True)
-    return df
-
-def salvar_reuniao(nova):
-    df = carregar_reunioes()
-    df = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
+def carregar_reunioes() -> pd.DataFrame:
     try:
-        df.to_excel(ARQUIVO_REUNIOES, index=False)
-    except PermissionError:
-        raise PermissionError("❌ Feche o arquivo 'reunioes.xlsx' no Excel e tente novamente.")
+        df = _ler_aba(ABA_REUNIOES)
+        if df.empty:
+            return pd.DataFrame(columns=[
+                "Título","Responsável","Participantes","Empresa",
+                "Data","Horário","Local","Observações"
+            ])
+        if "Data" in df.columns:
+            df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
+        return df.reset_index(drop=True)
+    except Exception as e:
+        st.error(f"Erro ao carregar reuniões: {e}")
+        return pd.DataFrame()
 
-def deletar_reuniao(index):
+def salvar_reuniao(nova: dict):
+    df = carregar_reunioes()
+    nova_fmt = nova.copy()
+    if "Data" in nova_fmt and hasattr(nova_fmt["Data"], 'strftime'):
+        nova_fmt["Data"] = nova_fmt["Data"].strftime("%Y-%m-%d")
+    df = pd.concat([df, pd.DataFrame([nova_fmt])], ignore_index=True)
+    _salvar_aba(ABA_REUNIOES, df)
+
+def deletar_reuniao(index: int):
     df = carregar_reunioes()
     df = df.drop(index=index).reset_index(drop=True)
-    try:
-        df.to_excel(ARQUIVO_REUNIOES, index=False)
-    except PermissionError:
-        raise PermissionError("❌ Feche o arquivo 'reunioes.xlsx' no Excel e tente novamente.")
+    _salvar_aba(ABA_REUNIOES, df)
 
 # ── Sprints ───────────────────────────────────────────────────────────────────
 def segunda_da_semana():
@@ -149,39 +181,30 @@ def segunda_da_semana():
 def proxima_segunda():
     hoje = date.today()
     dias = (7 - hoje.weekday()) % 7
-    if dias == 0:
-        dias = 7
-    return hoje + timedelta(days=dias)
+    return hoje + timedelta(days=dias if dias != 0 else 7)
 
-def carregar_sprints():
-    os.makedirs("data", exist_ok=True)
-    if not os.path.exists(ARQUIVO_SPRINT):
-        df = pd.DataFrame(columns=[
-            "Semana", "BU", "Responsável", "Progressos", "Desafios",
-            "Próxima Sprint", "Meta", "Realizado"
-        ])
-        df.to_excel(ARQUIVO_SPRINT, index=False)
+def carregar_sprints() -> pd.DataFrame:
+    try:
+        df = _ler_aba(ABA_SPRINTS)
+        if df.empty:
+            return pd.DataFrame(columns=[
+                "Semana","BU","Responsável","Progressos","Desafios",
+                "Próxima Sprint","Meta","Realizado"
+            ])
+        if "Semana" in df.columns:
+            df["Semana"] = pd.to_datetime(df["Semana"], errors="coerce")
+        if "BU" in df.columns:
+            df["BU"] = df["BU"].apply(_normalizar_bu)
         return df
+    except Exception as e:
+        st.error(f"Erro ao carregar sprints: {e}")
+        return pd.DataFrame()
 
-    df = pd.read_excel(ARQUIVO_SPRINT)
-    if "Semana" in df.columns:
-        df["Semana"] = pd.to_datetime(df["Semana"], errors="coerce")
-    if "BU" in df.columns:
-        bu_original = df["BU"].copy()
-        df["BU"] = df["BU"].apply(_normalizar_bu)
-        if not bu_original.equals(df["BU"]):
-            try:
-                df.to_excel(ARQUIVO_SPRINT, index=False)
-            except PermissionError:
-                pass
-    return df
-
-def salvar_sprint(nova):
+def salvar_sprint(nova: dict):
     if "BU" in nova:
         nova["BU"] = _normalizar_bu(nova["BU"])
+    if "Semana" in nova and hasattr(nova["Semana"], 'strftime'):
+        nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d")
     df = carregar_sprints()
     df = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
-    try:
-        df.to_excel(ARQUIVO_SPRINT, index=False)
-    except PermissionError:
-        raise PermissionError("❌ Feche o arquivo 'sprints_db.xlsx' no Excel e tente novamente.")
+    _salvar_aba(ABA_SPRINTS, df)
