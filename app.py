@@ -22,124 +22,19 @@ if _token_valido and _token_url != _token_valido:
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
-    :root {
-        --g:      rgb(0,210,60);
-        --g-dim:  rgba(0,210,60,0.12);
-        --g-glow: rgba(0,210,60,0.30);
-        --bg:     #080f0a;
-        --card:   #0d1810;
-        --card2:  #101f13;
-        --border: rgba(0,210,60,0.16);
-        --txt:    #eef5ef;
-        --muted:  #5a7d60;
+    .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem; }
+    header[data-testid="stHeader"] { background: rgba(15,23,42,0.95); backdrop-filter: blur(8px); }
+    .stMetric label { font-size: 0.85rem; color: #94a3b8; }
+    div[data-testid="stSidebar"] { background-color: #0f172a; }
+    .sprint-card {
+        background: #1e293b; border-radius: 10px; padding: 1rem 1.2rem;
+        margin-bottom: 0.8rem; border-left: 4px solid #3b82f6;
     }
-
-    html, body, [data-testid="stAppViewContainer"] {
-        background-color: var(--bg) !important;
-        font-family: 'DM Sans', sans-serif !important;
-        color: var(--txt) !important;
-    }
-    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; max-width:1400px !important; }
-
-    /* Header */
-    header[data-testid="stHeader"] {
-        background: rgba(8,15,10,0.97) !important;
-        backdrop-filter: blur(12px) !important;
-        border-bottom: 1px solid var(--border) !important;
-    }
-
-    /* Sidebar */
-    div[data-testid="stSidebar"] {
-        background: linear-gradient(180deg,#060e08 0%,#0a1a0c 100%) !important;
-        border-right: 1px solid var(--border) !important;
-    }
-    div[data-testid="stSidebar"] label, div[data-testid="stSidebar"] p { color: var(--muted) !important; font-size:0.82rem !important; }
-
-    /* Tabs */
-    button[data-baseweb="tab"] { font-family:'DM Sans',sans-serif !important; font-weight:600 !important; font-size:0.85rem !important; color:var(--muted) !important; }
-    button[data-baseweb="tab"][aria-selected="true"] { color:var(--g) !important; }
-    div[data-baseweb="tab-highlight"] { background:var(--g) !important; height:2px !important; }
-    div[data-baseweb="tab-border"] { background:var(--border) !important; }
-
-    /* Métricas */
-    div[data-testid="metric-container"] {
-        background: var(--card) !important; border:1px solid var(--border) !important;
-        border-radius:12px !important; padding:1rem 1.2rem !important;
-        position:relative !important; overflow:hidden !important;
-    }
-    div[data-testid="metric-container"]::before {
-        content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--g);
-    }
-    div[data-testid="metric-container"] label { font-size:0.75rem !important; color:var(--muted) !important; text-transform:uppercase !important; letter-spacing:1px !important; font-weight:600 !important; }
-    div[data-testid="metric-container"] [data-testid="stMetricValue"] { color:var(--txt) !important; font-size:1.9rem !important; font-weight:700 !important; font-family:'DM Mono',monospace !important; }
-
-    /* Botões primários */
-    button[kind="primary"], button[data-testid="baseButton-primary"] {
-        background: var(--g) !important; color:#060e08 !important; font-weight:700 !important;
-        border:none !important; border-radius:8px !important;
-        box-shadow: 0 0 18px var(--g-glow) !important; transition:all 0.2s !important;
-    }
-    button[kind="primary"]:hover { background:#00f040 !important; transform:translateY(-1px) !important; box-shadow:0 0 28px var(--g-glow) !important; }
-
-    /* Botões secundários */
-    button[kind="secondary"], button[data-testid="baseButton-secondary"] {
-        background:transparent !important; color:var(--g) !important;
-        border:1px solid var(--border) !important; border-radius:8px !important; transition:all 0.2s !important;
-    }
-    button[kind="secondary"]:hover { border-color:var(--g) !important; background:var(--g-dim) !important; }
-
-    /* Inputs */
-    div[data-testid="stTextInput"] input, div[data-testid="stNumberInput"] input, textarea {
-        background:var(--card2) !important; border:1px solid var(--border) !important;
-        border-radius:8px !important; color:var(--txt) !important; font-family:'DM Sans',sans-serif !important;
-    }
-    div[data-testid="stTextInput"] input:focus, textarea:focus {
-        border-color:var(--g) !important; box-shadow:0 0 0 2px var(--g-dim) !important;
-    }
-    div[data-baseweb="select"] > div {
-        background:var(--card2) !important; border:1px solid var(--border) !important;
-        border-radius:8px !important; color:var(--txt) !important;
-    }
-
-    /* Expanders */
-    details[data-testid="stExpander"] {
-        background:var(--card) !important; border:1px solid var(--border) !important;
-        border-radius:12px !important; overflow:hidden !important; transition:border-color 0.2s !important;
-    }
-    details[data-testid="stExpander"]:hover { border-color:rgba(0,210,60,0.4) !important; }
-    details[data-testid="stExpander"] summary { font-weight:600 !important; color:var(--txt) !important; padding:0.8rem 1rem !important; }
-    details[data-testid="stExpander"] summary:hover { color:var(--g) !important; }
-
-    /* Progress bar */
-    div[data-testid="stProgress"] > div > div { background:var(--g) !important; box-shadow:0 0 8px var(--g-glow) !important; border-radius:4px !important; }
-    div[data-testid="stProgress"] > div { background:var(--card2) !important; border-radius:4px !important; }
-
-    /* Slider */
-    div[data-testid="stSlider"] [role="slider"] { background:var(--g) !important; box-shadow:0 0 10px var(--g-glow) !important; }
-
-    /* Divider */
-    hr { border-color:var(--border) !important; margin:0.8rem 0 !important; }
-
-    /* Headings */
-    h1,h2,h3,h4 { font-family:'DM Sans',sans-serif !important; color:var(--txt) !important; font-weight:700 !important; letter-spacing:-0.3px !important; }
-
-    /* Sprint card */
-    .sprint-card { background:var(--card); border-radius:12px; padding:1rem 1.2rem; margin-bottom:0.8rem; border-left:3px solid var(--g); box-shadow:0 0 20px rgba(0,210,60,0.04); }
-    .sprint-card h4 { margin:0 0 0.4rem 0; color:var(--txt); font-size:0.95rem; }
-    .sprint-card p  { margin:0.15rem 0; color:var(--muted); font-size:0.82rem; }
-
-    /* Prioridades */
-    .prio-alta  { color:#ff4d4d; font-weight:700; }
-    .prio-media { color:#f59e0b; font-weight:700; }
-    .prio-baixa { color:var(--g); font-weight:700; }
-
-    /* Scrollbar */
-    ::-webkit-scrollbar { width:5px; height:5px; }
-    ::-webkit-scrollbar-track { background:var(--bg); }
-    ::-webkit-scrollbar-thumb { background:rgba(0,210,60,0.25); border-radius:3px; }
-    ::-webkit-scrollbar-thumb:hover { background:var(--g); }
+    .sprint-card h4 { margin: 0 0 0.4rem 0; color: #e2e8f0; font-size: 0.95rem; }
+    .sprint-card p  { margin: 0.15rem 0; color: #94a3b8; font-size: 0.82rem; }
+    .prio-alta   { color: #ef4444; font-weight: 700; }
+    .prio-media  { color: #f59e0b; font-weight: 700; }
+    .prio-baixa  { color: #22c55e; font-weight: 700; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -148,7 +43,7 @@ df = carregar_dados()
 
 CORES_STATUS = {
     "Em andamento": "#3b82f6",
-    "Concluído":    "rgb(0,210,60)",
+    "Concluído":    "#22c55e",
     "Atrasado":     "#ef4444",
     "Pausado":      "#f59e0b",
 }
@@ -156,18 +51,9 @@ PRIO_ORDEM = {"Alta": 0, "Média": 1, "Baixa": 2}
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-        <div style="padding:0.5rem 0 1.2rem 0;">
-            <img src="app/static/evoy.png"
-                 onerror="this.outerHTML='<div style=\\'font-family:DM Sans,sans-serif;font-size:1.5rem;font-weight:800;color:rgb(0,210,60);letter-spacing:-1px;\\'>evoy</div>'"
-                 style="height:34px;margin-bottom:5px;display:block;" />
-            <div style="font-size:10px;color:rgba(0,210,60,0.45);letter-spacing:2.5px;text-transform:uppercase;font-weight:600;">
-                TI Dashboard
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.title("📊 TI Dashboard")
     st.divider()
-    st.markdown("<div style='font-size:11px;color:rgba(0,210,60,0.6);letter-spacing:1.5px;text-transform:uppercase;font-weight:600;margin-bottom:8px'>🔍 Filtros</div>", unsafe_allow_html=True)
+    st.header("🔍 Filtros")
     busca = st.text_input("Pesquisar projeto...", placeholder="Ex: Sistema de RH")
     responsaveis = st.multiselect(
         "Responsável",
@@ -222,10 +108,6 @@ with tab_dash:
                   delta=f"-{atrasados_n}" if atrasados_n > 0 else None, delta_color="inverse")
         c5.metric("📊 Progresso Médio", f"{media_prog:.0f}%")
         st.divider()
-
-        _layout = dict(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                       font=dict(family="DM Sans", color="#eef5ef"), margin=dict(t=10,b=10))
-
         col_a,col_b = st.columns(2)
         with col_a:
             st.markdown("#### Status dos Projetos")
@@ -233,7 +115,9 @@ with tab_dash:
             cnt.columns = ["Status","Qtd"]
             fig = px.pie(cnt, names="Status", values="Qtd",
                          color="Status", color_discrete_map=CORES_STATUS, hole=0.45)
-            fig.update_layout(**_layout, legend=dict(orientation="h",yanchor="bottom",y=-0.2))
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                              legend=dict(orientation="h",yanchor="bottom",y=-0.2),
+                              margin=dict(t=10,b=10))
             st.plotly_chart(fig, use_container_width=True)
         with col_b:
             st.markdown("#### Progresso (%) por Projeto")
@@ -243,7 +127,9 @@ with tab_dash:
                     x=df_p["Progresso (%)"], y=df_p["Projeto"], orientation="h",
                     marker_color=df_p["Status"].map(CORES_STATUS).fillna("#64748b").tolist(),
                     text=df_p["Progresso (%)"].astype(int).astype(str)+"%", textposition="outside"))
-                fig2.update_layout(**_layout, xaxis=dict(range=[0,115],showgrid=False), showlegend=False, margin=dict(t=10,b=10,r=40))
+                fig2.update_layout(paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
+                                   xaxis=dict(range=[0,115],showgrid=False),
+                                   margin=dict(t=10,b=10,r=40),showlegend=False)
                 st.plotly_chart(fig2, use_container_width=True)
         col_c,col_d = st.columns(2)
         with col_c:
@@ -251,9 +137,9 @@ with tab_dash:
             if not df_filtrado.empty:
                 rc = df_filtrado["Responsável"].value_counts().reset_index()
                 rc.columns = ["Responsável","Projetos"]
-                fig3 = px.bar(rc,x="Responsável",y="Projetos",color="Projetos",
-                              color_continuous_scale=["#0d3318","rgb(0,210,60)"])
-                fig3.update_layout(**_layout, coloraxis_showscale=False)
+                fig3 = px.bar(rc,x="Responsável",y="Projetos",color="Projetos",color_continuous_scale="Blues")
+                fig3.update_layout(paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
+                                   coloraxis_showscale=False,margin=dict(t=10,b=10))
                 st.plotly_chart(fig3, use_container_width=True)
         with col_d:
             st.markdown("#### Linha do Tempo (Prazos)")
@@ -263,7 +149,8 @@ with tab_dash:
                     fig4 = px.timeline(df_g,x_start="Início",x_end="Prazo",
                                        y="Projeto",color="Status",color_discrete_map=CORES_STATUS)
                     fig4.update_yaxes(autorange="reversed")
-                    fig4.update_layout(**_layout, showlegend=False)
+                    fig4.update_layout(paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
+                                       showlegend=False,margin=dict(t=10,b=10))
                     st.plotly_chart(fig4, use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -362,9 +249,13 @@ with tab_cal:
     hoje_cal = date.today()
 
     reunioes = carregar_reunioes()
+
+    # ── Sub-tabs: Calendário | Gerenciar Reuniões ─────────────────────────────
     sub_cal, sub_gerenciar = st.tabs(["📅 Calendário", "🗂️ Gerenciar Reuniões"])
 
+    # ══ SUB-TAB: CALENDÁRIO ═══════════════════════════════════════════════════
     with sub_cal:
+        # ── Formulário ────────────────────────────────────────────────────────
         with st.form("form_reuniao", clear_on_submit=True):
             st.markdown("##### ➕ Agendar Reunião")
             c1,c2,c3,c4 = st.columns(4)
@@ -391,8 +282,9 @@ with tab_cal:
                     })
                     st.rerun()
 
+        # ── Monta eventos ──────────────────────────────────────────────────────
         df_cal   = carregar_dados()
-        CORES_CAL = ["#00d23c","#8b5cf6","#ec4899","#f59e0b","#06b6d4","#ef4444","#3b82f6","#f97316"]
+        CORES_CAL = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#f97316"]
         eventos = []
 
         if not reunioes.empty:
@@ -427,7 +319,7 @@ with tab_cal:
                     prazo_str = pd.to_datetime(row["Prazo"]).date().strftime("%Y-%m-%d")
                     status_p  = str(row.get("Status",""))
                     cor_p     = CORES_STATUS.get(status_p,"#64748b")
-                    prog_p    = int(row.get("Progresso (%)", 0))
+                    prog_p = int(row.get("Progresso (%)", 0))
                     eventos.append({
                         "id": f"p_{idx}", "title": f"🏁 {row['Projeto']} · {prog_p}%",
                         "start": prazo_str, "allDay": True,
@@ -436,29 +328,28 @@ with tab_cal:
                             "projeto":str(row.get("Projeto","")),
                             "responsavel":str(row.get("Responsável","")),
                             "status":status_p,
-                            "progresso":prog_p,}
+                            "progresso":int(row.get("Progresso (%)",0)),}
                     })
 
         ev_json = _json.dumps(eventos, ensure_ascii=False)
         _cv1.html("""
 <html><head><meta charset='utf-8'><style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:#080f0a;color:#eef5ef;padding:10px;}
+body{font-family:'Inter','Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:10px;}
 .nav{display:flex;align-items:center;gap:6px;margin-bottom:12px;}
-.nav-btn{background:#0d1810;color:#5a7d60;border:1px solid rgba(0,210,60,0.16);border-radius:7px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;transition:all 0.2s;}
-.nav-btn:hover{background:rgb(0,210,60);color:#060e08;border-color:rgb(0,210,60);}
-.nav-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#eef5ef;letter-spacing:-0.3px;}
-.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
-.hdr{background:#0d1810;text-align:center;font-size:10px;font-weight:700;color:rgba(0,210,60,0.5);padding:7px 2px;border-radius:6px;letter-spacing:1px;text-transform:uppercase;}
-.cell{background:#0a150c;border-radius:8px;min-height:90px;padding:6px 5px;border:1px solid rgba(0,210,60,0.08);transition:border-color 0.2s;}
-.cell:hover{border-color:rgba(0,210,60,0.3);}
-.cell.other-month{opacity:.25;}
-.cell.today{background:#0d2212;border-color:rgb(0,210,60)!important;box-shadow:0 0 12px rgba(0,210,60,0.15);}
-.day-num{font-size:11px;color:#5a7d60;margin-bottom:3px;font-weight:500;}
-.cell.today .day-num{color:#060e08;font-weight:800;background:rgb(0,210,60);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
-.ev{border-radius:4px;padding:2px 5px;font-size:10px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:600;}
-.more{font-size:10px;color:#5a7d60;margin-top:1px;}
+.nav-btn{background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:7px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:500;}
+.nav-btn:hover{background:#3b82f6;color:#fff;border-color:#3b82f6;}
+.nav-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#f1f5f9;}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.hdr{background:#1e293b;text-align:center;font-size:11px;font-weight:600;color:#64748b;padding:7px 2px;border-radius:5px;}
+.cell{background:#111827;border-radius:7px;min-height:88px;padding:6px 5px;border:1px solid transparent;}
+.cell:hover{border-color:#334155;}
+.cell.other-month{opacity:.35;}
+.cell.today{background:#0f2a4a;border-color:#3b82f6!important;}
+.day-num{font-size:11px;color:#64748b;margin-bottom:3px;font-weight:500;}
+.cell.today .day-num{color:#60a5fa;font-weight:700;background:#1d4ed8;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+.ev{border-radius:4px;padding:2px 5px;font-size:10px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:500;}
+.more{font-size:10px;color:#64748b;margin-top:1px;}
 </style></head><body>
 <div class='nav'>
   <button class='nav-btn' onclick='prev()'>&#8249; Anterior</button>
@@ -488,7 +379,8 @@ function render(){
     var evs=evDay(y,m,d);
     evs.slice(0,3).forEach(function(e){
       var el=mkd('ev',e.title);
-      el.style.background=e.backgroundColor||'rgb(0,210,60)';
+      el.style.background=e.backgroundColor||'#3b82f6';
+      var p=e.extendedProps||{};
       c.appendChild(el);
     });
     if(evs.length>3)c.appendChild(mkd('more','+'+(evs.length-3)+' mais'));
@@ -504,6 +396,7 @@ function goToday(){cur=new Date();cur.setDate(1);render();}
 render();
 </script></body></html>""".replace("EVENTOS_JSON", ev_json), height=620, scrolling=False)
 
+    # ══ SUB-TAB: GERENCIAR REUNIÕES ═══════════════════════════════════════════
     with sub_gerenciar:
         col_reunioes, col_projetos = st.columns([3, 2])
 
@@ -549,12 +442,13 @@ render();
                     status_p = str(proj.get("Status",""))
                     cor = CORES_STATUS.get(status_p, "#64748b")
                     prazo_p = pd.to_datetime(proj["Prazo"]).strftime("%d/%m") if pd.notna(proj.get("Prazo")) else "—"
+
                     st.markdown(
-                        f"<div style='margin-bottom:2px;font-size:13px;font-weight:600;color:#eef5ef'>"
+                        f"<div style='margin-bottom:2px;font-size:13px;font-weight:600;color:#e2e8f0'>"
                         f"{proj['Projeto']}"
                         f"<span style='float:right;font-size:12px;color:{cor};font-weight:700'>{prog}%</span>"
                         f"</div>"
-                        f"<div style='font-size:11px;color:#5a7d60;margin-bottom:5px'>"
+                        f"<div style='font-size:11px;color:#64748b;margin-bottom:5px'>"
                         f"👤 {proj.get('Responsável','')} &nbsp;·&nbsp; 📅 até {prazo_p} &nbsp;·&nbsp; "
                         f"<span style='color:{cor}'>{status_p}</span>"
                         f"</div>",
@@ -613,6 +507,7 @@ with tab_sprint:
                 if not bu or not responsavel_sp or not progressos:
                     st.error("Preencha BU, Responsável e Progressos.")
                 else:
+                    # Verifica duplicata por semana + BU + responsável
                     ja_existe = False
                     if not sprints.empty:
                         mask = (
@@ -626,14 +521,14 @@ with tab_sprint:
                         st.warning(f"⚠️ Sprint de **{bu}** / **{responsavel_sp}** já registrada nesta semana.")
                     else:
                         salvar_sprint({
-                            "Semana":         pd.Timestamp(seg_atual),
-                            "BU":             bu,
-                            "Responsável":    responsavel_sp,
-                            "Progressos":     progressos,
-                            "Desafios":       desafios,
+                            "Semana":       pd.Timestamp(seg_atual),
+                            "BU":           bu,
+                            "Responsável":  responsavel_sp,
+                            "Progressos":   progressos,
+                            "Desafios":     desafios,
                             "Próxima Sprint": proxima,
-                            "Meta":           meta,
-                            "Realizado":      realizado,
+                            "Meta":         meta,
+                            "Realizado":    realizado,
                         })
                         st.success(f"✅ Sprint de **{responsavel_sp}** ({bu}) salva!")
                         st.rerun()
