@@ -72,23 +72,25 @@ def _get_sheet(aba: str):
     sh = client.open_by_key(sheet_id)
     return sh.worksheet(aba)
 
+@st.cache_data(ttl=10)
 def _ler_aba(aba: str) -> pd.DataFrame:
-    """Lê uma aba e retorna DataFrame."""
+    """Lê uma aba e retorna DataFrame. Cache de 10s para evitar quota 429."""
     ws = _get_sheet(aba)
     data = ws.get_all_records()
     return pd.DataFrame(data) if data else pd.DataFrame()
 
 def _salvar_aba(aba: str, df: pd.DataFrame):
-    """Sobrescreve a aba inteira com o DataFrame."""
+    """Sobrescreve a aba inteira com o DataFrame e limpa cache."""
     ws = _get_sheet(aba)
     df2 = df.copy()
-    # Converte datas para string para evitar problemas de serialização
     for col in df2.columns:
         if pd.api.types.is_datetime64_any_dtype(df2[col]):
             df2[col] = df2[col].dt.strftime("%Y-%m-%d").fillna("")
     df2 = df2.fillna("").astype(str)
     ws.clear()
     ws.update([df2.columns.tolist()] + df2.values.tolist())
+    # Limpa cache para que próxima leitura pegue dados atualizados
+    _ler_aba.clear()
 
 # ── Projetos ──────────────────────────────────────────────────────────────────
 def carregar_dados() -> pd.DataFrame:
