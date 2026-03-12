@@ -337,21 +337,21 @@ with tab_cal:
 <html><head><meta charset='utf-8'><style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:#0f1729;color:#eef5ef;padding:10px;}
+body{font-family:'DM Sans',sans-serif;background:#05081a;color:#e6e9ff;padding:10px;}
 .nav{display:flex;align-items:center;gap:6px;margin-bottom:12px;}
-.nav-btn{background:#0d1810;color:#5a7d60;border:1px solid rgba(0,210,60,0.16);border-radius:7px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s;}
-.nav-btn:hover{background:rgb(0,210,60);color:#060e08;border-color:rgb(0,210,60);}
-.nav-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#eef5ef;}
+.nav-btn{background:#131c3a;color:#cbd5ff;border:1px solid rgba(99,102,241,0.3);border-radius:7px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s;}
+.nav-btn:hover{background:#4f46e5;color:#fff;border-color:rgba(99,102,241,0.7);}
+.nav-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#e6e9ff;}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
-.hdr{background:#0d1810;text-align:center;font-size:10px;font-weight:700;color:rgba(0,210,60,0.5);padding:7px 2px;border-radius:6px;letter-spacing:1px;text-transform:uppercase;}
-.cell{background:#262730;border-radius:8px;min-height:90px;padding:6px 5px;border:1px solid rgba(0,210,60,0.08);transition:border-color 0.2s;}
-.cell:hover{border-color:rgba(0,210,60,0.3);}
-.cell.other-month{opacity:.25;}
-.cell.today{background:#0d2212;border-color:rgb(0,210,60)!important;box-shadow:0 0 12px rgba(0,210,60,0.15);}
-.day-num{font-size:11px;color:#5a7d60;margin-bottom:3px;font-weight:500;}
-.cell.today .day-num{color:#060e08;font-weight:800;background:rgb(0,210,60);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
-.ev{border-radius:4px;padding:2px 5px;font-size:10px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:600;}
-.more{font-size:10px;color:#5a7d60;margin-top:1px;}
+.hdr{background:#0f172a;text-align:center;font-size:10px;font-weight:700;color:rgba(99,102,241,0.8);padding:7px 2px;border-radius:6px;letter-spacing:1px;text-transform:uppercase;}
+.cell{background:#0d122a;border-radius:8px;min-height:90px;padding:6px 5px;border:1px solid rgba(99,102,241,0.12);transition:border-color 0.2s,box-shadow 0.2s;}
+.cell:hover{border-color:rgba(99,102,241,0.4);box-shadow:0 0 12px rgba(99,102,241,0.18);}
+.cell.other-month{opacity:.35;}
+.cell.today{background:#1e2a5a;border-color:rgba(99,102,241,0.6)!important;box-shadow:0 0 16px rgba(99,102,241,0.25);}
+.day-num{font-size:11px;color:#a5b4fc;margin-bottom:3px;font-weight:500;}
+.cell.today .day-num{color:#0b1220;font-weight:800;background:rgba(99,102,241,0.9);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+.ev{border-radius:4px;padding:2px 5px;font-size:10px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#0b1220;font-weight:600;}
+.more{font-size:10px;color:#93c5fd;margin-top:1px;}
 </style></head><body>
 <div class='nav'>
   <button class='nav-btn' onclick='prev()'>&#8249; Anterior</button>
