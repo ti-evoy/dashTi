@@ -285,7 +285,7 @@ with tab_cal:
 
         # ── Monta eventos ──────────────────────────────────────────────────────
         df_cal   = carregar_dados()
-        CORES_CAL = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#f97316"]
+        CORES_CAL = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#ffffff","#ef4444","#06b6d4","#f97316"]
         eventos = []
 
         if not reunioes.empty:
