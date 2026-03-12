@@ -1,0 +1,198 @@
+
+/* =========================
+   FUNDO GERAL
+========================= */
+
+.stApp {
+    background-color: #ffffff;
+}
+
+/* =========================
+   TEXTO GLOBAL
+========================= */
+
+html, body {
+    color: #00382e !important;
+    font-family: "Roboto", sans-serif;
+}
+
+/* força cor em TODOS textos */
+p, span, label, div, li {
+    color: #00382e !important;
+}
+
+/* markdown */
+.stMarkdown {
+    color: #00382e !important;
+}
+
+/* títulos */
+h1, h2, h3, h4, h5, h6 {
+    color: #00382e !important;
+    font-weight: 600;
+}
+
+/* métricas */
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"] {
+    color: #00382e !important;
+}
+
+/* sidebar texto */
+section[data-testid="stSidebar"] * {
+    color: #00382e !important;
+}
+
+/* tabs */
+button[data-baseweb="tab"] {
+    color: #00382e !important;
+}
+
+/* inputs texto */
+input, textarea {
+    color: #00382e !important;
+}
+
+/* placeholder */
+input::placeholder {
+    color: #94a3b8 !important;
+}
+
+/* =========================
+   HEADER
+========================= */
+
+header[data-testid="stHeader"] {
+    background: #00382e;
+}
+
+/* =========================
+   SIDEBAR
+========================= */
+
+section[data-testid="stSidebar"] {
+    background: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+}
+
+/* =========================
+   BOTÕES
+========================= */
+
+.stButton>button {
+    background: #00382e;
+    color: white !important;
+    border-radius: 8px;
+    border: none;
+    padding: 8px 18px;
+    font-weight: 500;
+    transition: 0.2s;
+}
+
+.stButton>button:hover {
+    background: #0f6b57;
+}
+
+/* INPUTS */
+
+input, textarea {
+    background-color: #ffffff !important;
+    color: #00382e !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+}
+
+/* campo de texto do streamlit */
+div[data-baseweb="input"] > div {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+}
+
+/* texto dentro do input */
+div[data-baseweb="input"] input {
+    background-color: #ffffff !important;
+    color: #00382e !important;
+}
+
+/* placeholder */
+input::placeholder {
+    color: #94a3b8 !important;
+}
+
+/* quando selecionado */
+input:focus, textarea:focus {
+    border: 1px solid #0f6b57 !important;
+    box-shadow: 0 0 0 1px #0f6b57 !important;
+}
+
+
+
+/* =========================
+   PROGRESS BAR
+========================= */
+
+.stProgress > div > div > div > div {
+    background-color: #0f6b57;
+}
+
+/* =========================
+   METRIC CARDS
+========================= */
+
+[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 16px;
+    border-radius: 10px;
+}
+
+/* =========================
+   EXPANDER
+========================= */
+
+details {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+/* =========================
+   TABS
+========================= */
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #00382e !important;
+    border-bottom: 2px solid #00382e;
+}
+
+/* =========================
+   LINKS
+========================= */
+
+a {
+    color: #00382e !important;
+}
+
+a:hover {
+    color: #0f6b57 !important;
+}
+
+/* =========================
+   PRIORIDADES
+========================= */
+
+.prio-alta {
+    color: #dc2626 !important;
+    font-weight: 600;
+}
+
+.prio-media {
+    color: #d97706 !important;
+    font-weight: 600;
+}
+
+.prio-baixa {
+    color: #16a34a !important;
+    font-weight: 600;
+}
