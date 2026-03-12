@@ -162,7 +162,8 @@ with tab_projetos:
         st.info("Nenhum projeto encontrado.")
     else:
         PRIO_ICON = {"Alta":"🔴","Média":"🟡","Baixa":"🟢"}
-        for idx,row in df_filtrado.iterrows():
+        df_filtrado_reset = df_filtrado.reset_index(drop=True)
+        for idx, row in df_filtrado_reset.iterrows():
             prio_icon = PRIO_ICON.get(str(row.get("Prioridade","Média")),"🟡")
             prog = int(row.get("Progresso (%)",0))
             with st.expander(f"{prio_icon} **{row['Projeto']}** — {row['Responsável']} | {row['Status']} | {prog}%",expanded=False):
@@ -334,22 +335,23 @@ with tab_cal:
         ev_json = _json.dumps(eventos, ensure_ascii=False)
         _cv1.html("""
 <html><head><meta charset='utf-8'><style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter','Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;padding:10px;}
+body{font-family:'DM Sans',sans-serif;background:#080f0a;color:#eef5ef;padding:10px;}
 .nav{display:flex;align-items:center;gap:6px;margin-bottom:12px;}
-.nav-btn{background:#1e293b;color:#94a3b8;border:1px solid #334155;border-radius:7px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:500;}
-.nav-btn:hover{background:#3b82f6;color:#fff;border-color:#3b82f6;}
-.nav-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#f1f5f9;}
-.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
-.hdr{background:#1e293b;text-align:center;font-size:11px;font-weight:600;color:#64748b;padding:7px 2px;border-radius:5px;}
-.cell{background:#111827;border-radius:7px;min-height:88px;padding:6px 5px;border:1px solid transparent;}
-.cell:hover{border-color:#334155;}
-.cell.other-month{opacity:.35;}
-.cell.today{background:#0f2a4a;border-color:#3b82f6!important;}
-.day-num{font-size:11px;color:#64748b;margin-bottom:3px;font-weight:500;}
-.cell.today .day-num{color:#60a5fa;font-weight:700;background:#1d4ed8;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
-.ev{border-radius:4px;padding:2px 5px;font-size:10px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:500;}
-.more{font-size:10px;color:#64748b;margin-top:1px;}
+.nav-btn{background:#0d1810;color:#5a7d60;border:1px solid rgba(0,210,60,0.16);border-radius:7px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s;}
+.nav-btn:hover{background:rgb(0,210,60);color:#060e08;border-color:rgb(0,210,60);}
+.nav-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#eef5ef;}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.hdr{background:#0d1810;text-align:center;font-size:10px;font-weight:700;color:rgba(0,210,60,0.5);padding:7px 2px;border-radius:6px;letter-spacing:1px;text-transform:uppercase;}
+.cell{background:#0a150c;border-radius:8px;min-height:90px;padding:6px 5px;border:1px solid rgba(0,210,60,0.08);transition:border-color 0.2s;}
+.cell:hover{border-color:rgba(0,210,60,0.3);}
+.cell.other-month{opacity:.25;}
+.cell.today{background:#0d2212;border-color:rgb(0,210,60)!important;box-shadow:0 0 12px rgba(0,210,60,0.15);}
+.day-num{font-size:11px;color:#5a7d60;margin-bottom:3px;font-weight:500;}
+.cell.today .day-num{color:#060e08;font-weight:800;background:rgb(0,210,60);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+.ev{border-radius:4px;padding:2px 5px;font-size:10px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;font-weight:600;}
+.more{font-size:10px;color:#5a7d60;margin-top:1px;}
 </style></head><body>
 <div class='nav'>
   <button class='nav-btn' onclick='prev()'>&#8249; Anterior</button>
@@ -507,7 +509,6 @@ with tab_sprint:
                 if not bu or not responsavel_sp or not progressos:
                     st.error("Preencha BU, Responsável e Progressos.")
                 else:
-                    # Verifica duplicata por semana + BU + responsável
                     ja_existe = False
                     if not sprints.empty:
                         mask = (
