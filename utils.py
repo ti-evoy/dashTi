@@ -72,7 +72,7 @@ def _get_sheet(aba: str):
     sh = client.open_by_key(sheet_id)
     return sh.worksheet(aba)
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=60)
 def _ler_aba(aba: str) -> pd.DataFrame:
     """Lê uma aba e retorna DataFrame. Cache de 10s para evitar quota 429."""
     ws = _get_sheet(aba)
@@ -108,6 +108,16 @@ def carregar_dados() -> pd.DataFrame:
             df["Progresso (%)"] = pd.to_numeric(df["Progresso (%)"], errors="coerce").fillna(0)
         if "Prioridade" not in df.columns: df["Prioridade"] = "Média"
         if "Etapas"     not in df.columns: df["Etapas"] = ""
+        # Recalcula progresso a partir das etapas se o valor for 0 mas etapas existirem
+        def _recalc(row):
+            val = str(row.get("Etapas",""))
+            if val and val not in ("nan","") and int(row.get("Progresso (%)", 0)) == 0:
+                bits = val.split(",")
+                feitas = sum(1 for b in bits if b.strip() == "1")
+                total = len(ETAPAS_PROJETO)
+                return round((feitas / total) * 100)
+            return row.get("Progresso (%)", 0)
+        df["Progresso (%)"] = df.apply(_recalc, axis=1)
         return df
     except Exception as e:
         st.error(f"Erro ao carregar projetos: {e}")
@@ -123,7 +133,7 @@ def salvar_projeto(novo: dict):
     _salvar_aba(ABA_PROJETOS, df)
 
 def atualizar_etapas(idx, etapas):
-    df = carregar_dados()
+    df = carregar_dados().reset_index(drop=True)
     etapas_str = ",".join(["1" if e else "0" for e in etapas])
     progresso  = calcular_progresso(etapas)
     df.at[idx, "Etapas"]        = etapas_str
