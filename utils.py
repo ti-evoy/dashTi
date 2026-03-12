@@ -12,12 +12,10 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-# Nomes das abas na planilha Google Sheets
 ABA_PROJETOS  = "projetos"
 ABA_REUNIOES  = "reunioes"
 ABA_SPRINTS   = "sprints"
 
-# Fallback local (desenvolvimento sem internet)
 ARQUIVO_LOCAL_PROJETOS  = "data/projetos.xlsx"
 ARQUIVO_LOCAL_REUNIOES  = "data/reunioes.xlsx"
 ARQUIVO_LOCAL_SPRINTS   = "data/sprints_db.xlsx"
@@ -60,28 +58,65 @@ def calcular_progresso(etapas_concluidas):
 # ── Conexão Google Sheets ─────────────────────────────────────────────────────
 @st.cache_resource
 def _get_client():
-    """Retorna cliente gspread autenticado via st.secrets."""
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return gspread.authorize(creds)
 
 def _get_sheet(aba: str):
-    """Retorna worksheet pelo nome da aba."""
     client = _get_client()
     sheet_id = st.secrets["SHEET_ID"]
     sh = client.open_by_key(sheet_id)
     return sh.worksheet(aba)
 
-@st.cache_data(ttl=60)
+# ── Cache com session_state para evitar releituras imediatas após salvar ──────
+_CACHE_TTL_SEGUNDOS = 30   # tempo que o cache local dura após uma leitura normal
+_CACHE_POS_SAVE_TTL = 20   # tempo que o cache local dura após um salvamento
+
+def _cache_key(aba):
+    return f"__aba_cache_{aba}"
+
+def _cache_ts_key(aba):
+    return f"__aba_cache_ts_{aba}"
+
+def _cache_get(aba: str):
+    """Retorna DataFrame do cache local se ainda válido, senão None."""
+    key    = _cache_key(aba)
+    ts_key = _cache_ts_key(aba)
+    if key in st.session_state and ts_key in st.session_state:
+        idade = (datetime.now() - st.session_state[ts_key]).total_seconds()
+        if idade < _CACHE_TTL_SEGUNDOS:
+            return st.session_state[key]
+    return None
+
+def _cache_set(aba: str, df: pd.DataFrame, ttl: int = _CACHE_TTL_SEGUNDOS):
+    """Salva DataFrame no cache local do session_state."""
+    st.session_state[_cache_key(aba)]    = df.copy()
+    st.session_state[_cache_ts_key(aba)] = datetime.now()
+
 def _ler_aba(aba: str) -> pd.DataFrame:
-    """Lê uma aba e retorna DataFrame. Cache de 10s para evitar quota 429."""
-    ws = _get_sheet(aba)
+    """
+    Lê uma aba do Google Sheets.
+    Primeiro verifica o cache local (session_state) para evitar
+    múltiplas chamadas à API em sequência e o erro 429.
+    """
+    cached = _cache_get(aba)
+    if cached is not None:
+        return cached
+
+    ws   = _get_sheet(aba)
     data = ws.get_all_records()
-    return pd.DataFrame(data) if data else pd.DataFrame()
+    df   = pd.DataFrame(data) if data else pd.DataFrame()
+    _cache_set(aba, df)
+    return df
 
 def _salvar_aba(aba: str, df: pd.DataFrame):
-    """Sobrescreve a aba inteira com o DataFrame e limpa cache."""
-    ws = _get_sheet(aba)
+    """
+    Sobrescreve a aba inteira com o DataFrame.
+    Atualiza o cache local com os dados recém-salvos
+    em vez de limpar o cache — isso evita releitura imediata
+    e o consequente erro 429.
+    """
+    ws  = _get_sheet(aba)
     df2 = df.copy()
     for col in df2.columns:
         if pd.api.types.is_datetime64_any_dtype(df2[col]):
@@ -89,8 +124,10 @@ def _salvar_aba(aba: str, df: pd.DataFrame):
     df2 = df2.fillna("").astype(str)
     ws.clear()
     ws.update([df2.columns.tolist()] + df2.values.tolist())
-    # Limpa cache para que próxima leitura pegue dados atualizados
-    _ler_aba.clear()
+
+    # ✅ Atualiza cache com os dados que acabamos de salvar
+    # (sem bater na API de novo) — e renova o TTL
+    _cache_set(aba, df, ttl=_CACHE_POS_SAVE_TTL)
 
 # ── Projetos ──────────────────────────────────────────────────────────────────
 def carregar_dados() -> pd.DataFrame:
@@ -108,15 +145,16 @@ def carregar_dados() -> pd.DataFrame:
             df["Progresso (%)"] = pd.to_numeric(df["Progresso (%)"], errors="coerce").fillna(0)
         if "Prioridade" not in df.columns: df["Prioridade"] = "Média"
         if "Etapas"     not in df.columns: df["Etapas"] = ""
-        # Recalcula progresso a partir das etapas se o valor for 0 mas etapas existirem
+
         def _recalc(row):
             val = str(row.get("Etapas",""))
             if val and val not in ("nan","") and int(row.get("Progresso (%)", 0)) == 0:
-                bits = val.split(",")
+                bits  = val.split(",")
                 feitas = sum(1 for b in bits if b.strip() == "1")
-                total = len(ETAPAS_PROJETO)
+                total  = len(ETAPAS_PROJETO)
                 return round((feitas / total) * 100)
             return row.get("Progresso (%)", 0)
+
         df["Progresso (%)"] = df.apply(_recalc, axis=1)
         return df
     except Exception as e:
