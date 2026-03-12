@@ -285,7 +285,7 @@ with tab_cal:
 
         # ── Monta eventos ──────────────────────────────────────────────────────
         df_cal   = carregar_dados()
-        CORES_CAL = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#ffffff","#ef4444","#06b6d4","#f97316"]
+        CORES_CAL = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#f97316"]
         eventos = []
 
         if not reunioes.empty:
@@ -337,14 +337,14 @@ with tab_cal:
 <html><head><meta charset='utf-8'><style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'DM Sans',sans-serif;background:#080f0a;color:#eef5ef;padding:10px;}
+body{font-family:'DM Sans',sans-serif;background:#0f1729;color:#eef5ef;padding:10px;}
 .nav{display:flex;align-items:center;gap:6px;margin-bottom:12px;}
 .nav-btn{background:#0d1810;color:#5a7d60;border:1px solid rgba(0,210,60,0.16);border-radius:7px;padding:5px 14px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s;}
 .nav-btn:hover{background:rgb(0,210,60);color:#060e08;border-color:rgb(0,210,60);}
 .nav-title{flex:1;text-align:center;font-size:15px;font-weight:700;color:#eef5ef;}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
 .hdr{background:#0d1810;text-align:center;font-size:10px;font-weight:700;color:rgba(0,210,60,0.5);padding:7px 2px;border-radius:6px;letter-spacing:1px;text-transform:uppercase;}
-.cell{background:#0a150c;border-radius:8px;min-height:90px;padding:6px 5px;border:1px solid rgba(0,210,60,0.08);transition:border-color 0.2s;}
+.cell{background:#262730;border-radius:8px;min-height:90px;padding:6px 5px;border:1px solid rgba(0,210,60,0.08);transition:border-color 0.2s;}
 .cell:hover{border-color:rgba(0,210,60,0.3);}
 .cell.other-month{opacity:.25;}
 .cell.today{background:#0d2212;border-color:rgb(0,210,60)!important;box-shadow:0 0 12px rgba(0,210,60,0.15);}
