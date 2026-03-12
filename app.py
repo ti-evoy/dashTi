@@ -11,7 +11,7 @@ from utils import (
 )
 
 # ── Página ────────────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Dashboard TI", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Dashboard TI", page_icon="", layout="wide")
 
 # ── Proteção por token na URL ─────────────────────────────────────────────────
 _token_valido = st.secrets.get("TOKEN_ACESSO", "")
@@ -67,7 +67,7 @@ with st.sidebar:
     )
     progresso_range = st.slider("Progresso (%)", 0, 100, (0, 100))
     st.divider()
-    st.button("🔄 Atualizar dados", use_container_width=True)
+    st.button("Atualizar dados", use_container_width=True)
 
 # ── Aplica filtros ────────────────────────────────────────────────────────────
 df_filtrado = df.copy()
@@ -84,7 +84,7 @@ if "Progresso (%)" in df_filtrado.columns:
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_dash, tab_projetos, tab_novo, tab_cal, tab_sprint = st.tabs([
-    "📈 Dashboard", "📋 Projetos", "➕ Novo Projeto", "📅 Calendário", "🏃 Sprint"
+    "Dashboard", "Projetos", "Novo Projeto", "Calendário", "Sprint"
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -101,12 +101,12 @@ with tab_dash:
         atrasados_n  = len(projetos_atrasados(df_filtrado)) if not df_filtrado.empty else 0
         media_prog   = df_filtrado["Progresso (%)"].mean() if not df_filtrado.empty else 0
         c1,c2,c3,c4,c5 = st.columns(5)
-        c1.metric("📁 Total", total)
-        c2.metric("🔄 Em Andamento", em_andamento)
-        c3.metric("✅ Concluídos", concluidos)
-        c4.metric("⚠️ Atrasados", atrasados_n,
+        c1.metric("Total", total)
+        c2.metric("Em Andamento", em_andamento)
+        c3.metric("Concluídos", concluidos)
+        c4.metric("Atrasados", atrasados_n,
                   delta=f"-{atrasados_n}" if atrasados_n > 0 else None, delta_color="inverse")
-        c5.metric("📊 Progresso Médio", f"{media_prog:.0f}%")
+        c5.metric("Progresso Médio", f"{media_prog:.0f}%")
         st.divider()
         col_a,col_b = st.columns(2)
         with col_a:
@@ -252,7 +252,7 @@ with tab_cal:
     reunioes = carregar_reunioes()
 
     # ── Sub-tabs: Calendário | Gerenciar Reuniões ─────────────────────────────
-    sub_cal, sub_gerenciar = st.tabs(["📅 Calendário", "🗂️ Gerenciar Reuniões"])
+    sub_cal, sub_gerenciar = st.tabs(["Calendário", " Gerenciar Reuniões"])
 
     # ══ SUB-TAB: CALENDÁRIO ═══════════════════════════════════════════════════
     with sub_cal:
@@ -270,7 +270,7 @@ with tab_cal:
             hora_m  = c7.selectbox("Minuto *", [0,15,30,45],               format_func=lambda x:f"{x:02d}")
             local   = c8.text_input("Local / Link", placeholder="Sala 3 ou Meet")
             obs_r   = c9.text_input("Obs.", placeholder="Pauta...")
-            if st.form_submit_button("📅 Salvar Reunião", use_container_width=True, type="primary"):
+            if st.form_submit_button(" Salvar Reunião", use_container_width=True, type="primary"):
                 if not titulo_r or not responsavel_r or not participantes or not empresa:
                     st.error("Preencha os campos obrigatórios *.")
                 else:
@@ -301,7 +301,7 @@ with tab_cal:
                         st_ = data_str; en_ = data_str
                     cor = CORES_CAL[pos % len(CORES_CAL)]
                     eventos.append({
-                        "id": f"r_{pos}", "title": f"🤝 {hora} · {r['Título']}",
+                        "id": f"r_{pos}", "title": f"{hora} · {r['Título']}",
                         "start": st_, "end": en_,
                         "backgroundColor": cor, "borderColor": cor,
                         "extendedProps": {"tipo":"reuniao","idx":pos,
@@ -403,7 +403,7 @@ render();
         col_reunioes, col_projetos = st.columns([3, 2])
 
         with col_reunioes:
-            st.markdown("#### 🗂️ Reuniões Agendadas")
+            st.markdown("#### Reuniões Agendadas")
             if reunioes.empty:
                 st.info("Nenhuma reunião agendada ainda.")
             else:
@@ -414,9 +414,9 @@ render();
                         with col_info:
                             st.markdown(
                                 f"**{row['Título']}** &nbsp;|&nbsp; "
-                                f"📅 {data_fmt} {row.get('Horário','')} &nbsp;|&nbsp; "
-                                f"👤 {row.get('Responsável','')} &nbsp;|&nbsp; "
-                                f"🏢 {row.get('Empresa','')}"
+                                f"{data_fmt} {row.get('Horário','')} &nbsp;|&nbsp; "
+                                f"{row.get('Responsável','')} &nbsp;|&nbsp; "
+                                f" {row.get('Empresa','')}"
                             )
                             loc = str(row.get("Local",""))
                             obs = str(row.get("Observações",""))
@@ -428,12 +428,12 @@ render();
                         with col_btn:
                             if st.button("🗑️", key=f"del_{pos}", help="Excluir reunião"):
                                 deletar_reuniao(pos)
-                                st.toast("✅ Reunião excluída!", icon="🗑️")
+                                st.toast("Reunião excluída!", icon="🗑️")
                                 st.rerun()
                         st.divider()
 
         with col_projetos:
-            st.markdown("#### 📊 Progresso dos Projetos")
+            st.markdown("#### Progresso dos Projetos")
             df_prog = carregar_dados()
             if df_prog.empty:
                 st.info("Nenhum projeto cadastrado.")
@@ -451,7 +451,7 @@ render();
                         f"<span style='float:right;font-size:12px;color:{cor};font-weight:700'>{prog}%</span>"
                         f"</div>"
                         f"<div style='font-size:11px;color:#64748b;margin-bottom:5px'>"
-                        f"👤 {proj.get('Responsável','')} &nbsp;·&nbsp; 📅 até {prazo_p} &nbsp;·&nbsp; "
+                        f"{proj.get('Responsável','')} &nbsp;·&nbsp; até {prazo_p} &nbsp;·&nbsp; "
                         f"<span style='color:{cor}'>{status_p}</span>"
                         f"</div>",
                         unsafe_allow_html=True
@@ -463,7 +463,7 @@ render();
 # TAB 5 — SPRINT SEMANAL
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_sprint:
-    st.subheader("🏃 Sprint Semanal")
+    st.subheader("Sprint Semanal")
 
     sprints   = carregar_sprints()
     seg_atual = segunda_da_semana()
@@ -472,7 +472,7 @@ with tab_sprint:
 
     with col_form_sp:
         label_semana = f"Semana {seg_atual.strftime('%d/%m/%Y')}"
-        st.markdown(f"#### ✍️ Registrar Sprint — {label_semana}")
+        st.markdown(f"#### Registrar Sprint — {label_semana}")
 
         with st.form("form_sprint", clear_on_submit=True):
             bu = st.selectbox("BU / Área *", [
@@ -481,29 +481,29 @@ with tab_sprint:
             ])
             responsavel_sp = st.text_input("Responsável *", placeholder="Ex: Ana Silva")
             progressos = st.text_area(
-                "📈 Progressos da semana *",
+                "Progressos da semana *",
                 placeholder="- Concluímos o módulo X\n- Finalizamos a migração Y",
                 height=110
             )
             desafios = st.text_area(
-                "⚠️ Desafios",
+                "Desafios",
                 placeholder="- Atraso na entrega do fornecedor Z",
                 height=90
             )
             proxima = st.text_area(
-                "🔜 Próxima Sprint",
+                "Próxima Sprint",
                 placeholder="- Iniciar módulo W\n- Reunião com cliente",
                 height=90
             )
             meta = st.text_input(
-                "🎯 Meta da semana",
+                "Meta da semana",
                 placeholder="Ex: Disp. Core 98,5% | QA Projetos"
             )
             realizado = st.text_input(
-                "✅ Realizado vs Meta",
+                "Realizado vs Meta",
                 placeholder="Ex: 98,7% ✅"
             )
-            ok_sp = st.form_submit_button("💾 Salvar Sprint", use_container_width=True, type="primary")
+            ok_sp = st.form_submit_button("Salvar Sprint", use_container_width=True, type="primary")
 
             if ok_sp:
                 if not bu or not responsavel_sp or not progressos:
@@ -519,7 +519,7 @@ with tab_sprint:
                         ja_existe = mask.any()
 
                     if ja_existe:
-                        st.warning(f"⚠️ Sprint de **{bu}** / **{responsavel_sp}** já registrada nesta semana.")
+                        st.warning(f"Sprint de **{bu}** / **{responsavel_sp}** já registrada nesta semana.")
                     else:
                         salvar_sprint({
                             "Semana":       pd.Timestamp(seg_atual),
@@ -535,7 +535,7 @@ with tab_sprint:
                         st.rerun()
 
     with col_hist:
-        st.markdown("#### 📚 Histórico de Sprints")
+        st.markdown("####Histórico de Sprints")
 
         if sprints.empty:
             st.info("Nenhuma sprint registrada ainda.")
@@ -545,9 +545,9 @@ with tab_sprint:
 
             fc1, fc2 = st.columns(2)
             bus_disponiveis = ["Todas"] + sorted(sprints_ord["BU"].dropna().unique().tolist())
-            filtro_bu  = fc1.selectbox("🏢 Filtrar por BU", bus_disponiveis, key="filtro_bu_sprint")
+            filtro_bu  = fc1.selectbox("Filtrar por BU", bus_disponiveis, key="filtro_bu_sprint")
             semanas_disponiveis = sprints_ord["Semana"].dt.strftime("%d/%m/%Y").unique().tolist()
-            filtro_sem = fc2.selectbox("📅 Filtrar por Semana", ["Todas"] + semanas_disponiveis, key="filtro_sem_sprint")
+            filtro_sem = fc2.selectbox("Filtrar por Semana", ["Todas"] + semanas_disponiveis, key="filtro_sem_sprint")
 
             df_hist = sprints_ord.copy()
             if filtro_bu != "Todas":
@@ -568,20 +568,20 @@ with tab_sprint:
                     ):
                         col_s1, col_s2 = st.columns(2)
                         with col_s1:
-                            st.markdown(f"**👤 Responsável:** {sp.get('Responsável','')}")
-                            st.markdown(f"**🎯 Meta:** {sp.get('Meta','—')}")
-                            st.markdown(f"**✅ Realizado:** {sp.get('Realizado','—')}")
+                            st.markdown(f"**Responsável:** {sp.get('Responsável','')}")
+                            st.markdown(f"**Meta:** {sp.get('Meta','—')}")
+                            st.markdown(f"**Realizado:** {sp.get('Realizado','—')}")
                             st.divider()
-                            st.markdown("**📈 Progressos:**")
+                            st.markdown("**Progressos:**")
                             for linha in str(sp.get("Progressos","")).split("\n"):
                                 if linha.strip():
                                     st.markdown(f"- {linha.strip().lstrip('-').strip()}")
                         with col_s2:
-                            st.markdown("**⚠️ Desafios:**")
+                            st.markdown("**Desafios:**")
                             for linha in str(sp.get("Desafios","")).split("\n"):
                                 if linha.strip():
                                     st.markdown(f"- {linha.strip().lstrip('-').strip()}")
-                            st.markdown("**🔜 Próxima Sprint:**")
+                            st.markdown("**Próxima Sprint:**")
                             for linha in str(sp.get("Próxima Sprint","")).split("\n"):
                                 if linha.strip():
                                     st.markdown(f"- {linha.strip().lstrip('-').strip()}")
