@@ -22,123 +22,19 @@ if _token_valido and _token_url != _token_valido:
 
 st.markdown("""
 <style>
-
-/* Fundo geral */
-.stApp {
-    background-color: #ffffff;
-}
-
-/* Container principal */
-.block-container {
-    padding-top: 3rem !important;
-    padding-bottom: 2rem;
-    max-width: 1400px;
-}
-
-/* Header superior */
-header[data-testid="stHeader"] {
-    background: #00382e;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-/* Texto padrão */
-html, body, [class*="css"] {
-    color: #00382e;
-    font-family: "Roboto", sans-serif;
-}
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: #f8fafc;
-    border-right: 1px solid #e2e8f0;
-}
-
-/* Títulos */
-h1, h2, h3, h4 {
-    color: #00382e;
-    font-weight: 600;
-}
-
-/* Botões */
-.stButton>button {
-    background: #00382e;
-    color: white;
-    border-radius: 8px;
-    border: none;
-    padding: 8px 18px;
-    font-weight: 500;
-    transition: 0.2s;
-}
-
-/* Hover botão */
-.stButton>button:hover {
-    background: #0f6b57;
-}
-
-/* Inputs */
-input, textarea {
-    border-radius: 6px !important;
-}
-
-/* Progress bar */
-.stProgress > div > div > div > div {
-    background-color: #0f6b57;
-}
-
-/* Metric cards */
-[data-testid="stMetric"] {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    padding: 16px;
-    border-radius: 10px;
-}
-
-/* Hover links */
-a:hover {
-    color: #0f6b57;
-}
-
-/* Expander */
-details {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 6px;
-}
-
-/* Tabs */
-button[data-baseweb="tab"] {
-    font-weight: 500;
-}
-
-button[data-baseweb="tab"][aria-selected="true"] {
-    color: #00382e;
-    border-bottom: 2px solid #00382e;
-}
-
-/* Cards */
-.sprint-card {
-    background: #ffffff;
-    border-radius: 10px;
-    padding: 16px;
-    border: 1px solid #e2e8f0;
-}
-
-/* Prioridade */
-.prio-alta {
-    color: #dc2626;
-    font-weight: 600;
-}
-
-.prio-media {
-    color: #d97706;
-    font-weight: 600;
-}
-
-.prio-baixa {
-    color: #16a34a;
-    font-weight: 600;
-}
-
+    .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem; }
+    header[data-testid="stHeader"] { background: rgba(15,23,42,0.95); backdrop-filter: blur(8px); }
+    .stMetric label { font-size: 0.85rem; color: #94a3b8; }
+    div[data-testid="stSidebar"] { background-color: #0f172a; }
+    .sprint-card {
+        background: #1e293b; border-radius: 10px; padding: 1rem 1.2rem;
+        margin-bottom: 0.8rem; border-left: 4px solid #3b82f6;
+    }
+    .sprint-card h4 { margin: 0 0 0.4rem 0; color: #e2e8f0; font-size: 0.95rem; }
+    .sprint-card p  { margin: 0.15rem 0; color: #94a3b8; font-size: 0.82rem; }
+    .prio-alta   { color: #ef4444; font-weight: 700; }
+    .prio-media  { color: #f59e0b; font-weight: 700; }
+    .prio-baixa  { color: #22c55e; font-weight: 700; }
 </style>
 """, unsafe_allow_html=True)
 
