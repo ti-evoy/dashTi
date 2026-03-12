@@ -53,7 +53,7 @@ PRIO_ORDEM = {"Alta": 0, "Média": 1, "Baixa": 2}
 with st.sidebar:
     st.title("📊 TI Dashboard")
     st.divider()
-    st.header("🔍 Filtros")
+    st.header("Filtros")
     busca = st.text_input("Pesquisar projeto...", placeholder="Ex: Sistema de RH")
     responsaveis = st.multiselect(
         "Responsável",
@@ -258,7 +258,7 @@ with tab_cal:
     with sub_cal:
         # ── Formulário ────────────────────────────────────────────────────────
         with st.form("form_reuniao", clear_on_submit=True):
-            st.markdown("##### ➕ Agendar Reunião")
+            st.markdown("##### Agendar Reunião")
             c1,c2,c3,c4 = st.columns(4)
             titulo_r      = c1.text_input("Título *",        placeholder="Alinhamento X")
             responsavel_r = c2.text_input("Responsável *",   placeholder="Matheus")
