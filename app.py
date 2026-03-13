@@ -14,7 +14,7 @@ from utils import (
 st.set_page_config(page_title="Dashboard TI", page_icon="", layout="wide")
 
 # ── Proteção por token na URL ─────────────────────────────────────────────────
-_token_valido = st.secrets.get("TOKEN_ACESSO", "")
+_token_valido = ""#st.secrets.get("TOKEN_ACESSO", "")
 _token_url    = st.query_params.get("token", "")
 if _token_valido and _token_url != _token_valido:
     st.error("🔒 Acesso não autorizado. Verifique o link com sua equipe.")
@@ -35,6 +35,97 @@ st.markdown("""
     .prio-alta   { color: #00d339; font-weight: 700; }
     .prio-media  { color: #f59e0b; font-weight: 700; }
     .prio-baixa  { color: #22c55e; font-weight: 700; }
+
+    /* ── Cor da aba ativa ── */
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #00d339 !important;
+    }
+    /* Traço indicador embaixo da aba ativa */
+    [data-baseweb="tab-highlight"] {
+        background-color: #00d339 !important;
+    }
+    /* Fallback para versões mais novas do Streamlit */
+    [data-testid="stTabs"] button[aria-selected="true"] {
+        color: #00d339 !important;
+        border-bottom-color: #00d339 !important;
+    }
+            .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem; }
+    header[data-testid="stHeader"] { background: rgba(15,23,42,0.95); backdrop-filter: blur(8px); }
+    .stMetric label { font-size: 0.85rem; color: #94a3b8; }
+    div[data-testid="stSidebar"] { background-color: #0f172a; }
+    .sprint-card {
+        background: #1e293b; border-radius: 10px; padding: 1rem 1.2rem;
+        margin-bottom: 0.8rem; border-left: 4px solid #3b82f6;
+    }
+    .sprint-card h4 { margin: 0 0 0.4rem 0; color: #e2e8f0; font-size: 0.95rem; }
+    .sprint-card p  { margin: 0.15rem 0; color: #94a3b8; font-size: 0.82rem; }
+    .prio-alta   { color: #00d339; font-weight: 700; }
+    .prio-media  { color: #f59e0b; font-weight: 700; }
+    .prio-baixa  { color: #22c55e; font-weight: 700; }
+
+    /* Aba ativa */
+    button[data-baseweb="tab"][aria-selected="true"] { color: #00d339 !important; }
+    [data-baseweb="tab-highlight"] { background-color: #00d339 !important; }
+    [data-testid="stTabs"] button[aria-selected="true"] {
+        color: #00d339 !important;
+        border-bottom-color: #00d339 !important;
+    }
+
+    /* Hover das abas */
+    button[data-baseweb="tab"]:hover { color: #00d339 !important; }
+    [data-testid="stTabs"] button:hover {
+        color: #00d339 !important;
+        border-bottom-color: #00d339 !important;
+    }
+
+    /* Botão primário */
+    button[data-testid="baseButton-primary"] {
+        background-color: #00d339 !important;
+        border-color: #00d339 !important;
+        color: #060e08 !important;
+    }
+    button[data-testid="baseButton-primary"]:hover {
+        background-color: #00b82f !important;
+        border-color: #00b82f !important;
+    }
+             /* Botões primários - todos verdes */
+    button[data-testid="baseButton-primary"],
+    button[kind="primary"],
+    .stButton > button[kind="primary"] {
+        background-color: #00d339 !important;
+        border-color: #00d339 !important;
+        color: #060e08 !important;
+    }
+    button[data-testid="baseButton-primary"]:hover,
+    .stButton > button[kind="primary"]:hover {
+        background-color: #00b82f !important;
+        border-color: #00b82f !important;
+    }
+
+    /* Slider - bolinha e barra */
+    [data-testid="stSlider"] [role="slider"] { background-color: #00d339 !important; }
+    [data-testid="stSlider"] > div > div > div > div { background-color: #00d339 !important; }
+    [data-testid="stSlider"] .st-emotion-cache-1j0e0b7 { color: #00d339 !important; }
+
+    /* Checkboxes */
+    input[type="checkbox"]:checked + div,
+    [data-testid="stCheckbox"] svg { color: #00d339 !important; fill: #00d339 !important; }
+    [data-baseweb="checkbox"] [data-checked="true"] { background-color: #00d339 !important; border-color: #00d339 !important; }
+             [data-testid="stBaseButton-primaryFormSubmit"],
+    [data-testid="baseButton-primary"],
+    [data-testid="stBaseButton-primary"] {
+        background-color: #00d339 !important;
+        border-color: #00d339 !important;
+        color: #060e08 !important;
+    }
+    [data-testid="stBaseButton-primaryFormSubmit"]:hover,
+    [data-testid="baseButton-primary"]:hover,
+    [data-testid="stBaseButton-primary"]:hover {
+        background-color: #00b82f !important;
+        border-color: #00b82f !important;
+        color: #060e08 !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
