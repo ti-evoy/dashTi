@@ -14,7 +14,7 @@ from utils import (
 st.set_page_config(page_title="Dashboard TI", page_icon="", layout="wide")
 
 # ── Proteção por token na URL ─────────────────────────────────────────────────
-_token_valido = st.secrets.get("TOKEN_ACESSO", "")
+_token_valido = ""##st.secrets.get("TOKEN_ACESSO", "")
 _token_url    = st.query_params.get("token", "")
 if _token_valido and _token_url != _token_valido:
     st.error("🔒 Acesso não autorizado. Verifique o link com sua equipe.")
@@ -42,7 +42,7 @@ st.markdown("""
 df = carregar_dados()
 
 CORES_STATUS = {
-    "Em andamento": "#3b82f6",
+    "Em andamento": "#7fa17b",
     "Concluído":    "#22c55e",
     "Atrasado":     "#ef4444",
     "Pausado":      "#f59e0b",
@@ -51,7 +51,8 @@ PRIO_ORDEM = {"Alta": 0, "Média": 1, "Baixa": 2}
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.title("📊 TI Dashboard")
+    st.image("evoy.png",width=180)
+    st.image("dashti.png",width=80)
     st.divider()
     st.header("Filtros")
     busca = st.text_input("Pesquisar projeto...", placeholder="Ex: Sistema de RH")
@@ -157,7 +158,7 @@ with tab_dash:
 # TAB 2 — PROJETOS
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_projetos:
-    st.subheader("📋 Projetos")
+    st.subheader("Projetos")
     if df_filtrado.empty:
         st.info("Nenhum projeto encontrado.")
     else:
@@ -181,7 +182,7 @@ with tab_projetos:
                     st.progress(prog/100)
                     st.caption(f"Progresso: {prog}%")
                 with col_checks:
-                    st.markdown("**✅ Etapas do Projeto**")
+                    st.markdown("** Etapas do Projeto**")
                     etapas_atuais = get_etapas(row)
                     novas_etapas  = []
                     for i,etapa in enumerate(ETAPAS_PROJETO):
@@ -204,7 +205,7 @@ with tab_projetos:
 # TAB 3 — NOVO PROJETO
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_novo:
-    st.subheader("➕ Cadastrar Novo Projeto")
+    st.subheader("Cadastrar Novo Projeto")
     with st.form("form_novo_projeto",clear_on_submit=True):
         col1,col2 = st.columns(2)
         with col1:
@@ -217,14 +218,14 @@ with tab_novo:
             prazo     = st.date_input("Prazo *",value=date.today())
             horas     = st.number_input("Horas Gastas",min_value=0,value=0,step=1)
             descricao = st.text_area("Descrição",placeholder="Breve descrição...")
-        st.markdown("**✅ Etapas iniciais concluídas** *(opcional — você pode marcar depois na aba Projetos)*")
+        st.markdown("** Etapas iniciais concluídas** *(opcional — você pode marcar depois na aba Projetos)*")
         cols_etapas = st.columns(2)
         etapas_ini = []
         for i,etapa in enumerate(ETAPAS_PROJETO):
             etapas_ini.append(cols_etapas[i%2].checkbox(etapa,value=False,key=f"novo_etapa_{i}"))
         prog_ini = round((sum(etapas_ini)/len(ETAPAS_PROJETO))*100)
         st.info(f"Progresso calculado automaticamente: **{prog_ini}%**")
-        enviado = st.form_submit_button("✅ Cadastrar Projeto",use_container_width=True,type="primary")
+        enviado = st.form_submit_button(" Cadastrar Projeto",use_container_width=True,type="primary")
         if enviado:
             if not nome or not responsavel:
                 st.error("Preencha pelo menos Nome e Responsável.")
@@ -238,7 +239,7 @@ with tab_novo:
                     "Início":pd.Timestamp(inicio),"Prazo":pd.Timestamp(prazo),
                     "Horas Gastas":horas,"Descrição":descricao,
                 })
-                st.success(f"✅ Projeto **{nome}** cadastrado! Progresso inicial: {prog_ini}%")
+                st.success(f" Projeto **{nome}** cadastrado! Progresso inicial: {prog_ini}%")
                 st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -285,7 +286,7 @@ with tab_cal:
 
         # ── Monta eventos ──────────────────────────────────────────────────────
         df_cal   = carregar_dados()
-        CORES_CAL = ["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#f97316"]
+        CORES_CAL = ["#00245f","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#f97316"]
         eventos = []
 
         if not reunioes.empty:
@@ -322,7 +323,7 @@ with tab_cal:
                     cor_p     = CORES_STATUS.get(status_p,"#64748b")
                     prog_p = int(row.get("Progresso (%)", 0))
                     eventos.append({
-                        "id": f"p_{idx}", "title": f"🏁 {row['Projeto']} · {prog_p}%",
+                        "id": f"p_{idx}", "title": f" {row['Projeto']} · {prog_p}%",
                         "start": prazo_str, "allDay": True,
                         "backgroundColor": cor_p, "borderColor": cor_p,
                         "extendedProps": {"tipo":"prazo",
@@ -421,8 +422,8 @@ render();
                             loc = str(row.get("Local",""))
                             obs = str(row.get("Observações",""))
                             extra = []
-                            if loc and loc not in ("nan",""): extra.append(f"📍 {loc}")
-                            if obs and obs not in ("nan",""): extra.append(f"📝 {obs}")
+                            if loc and loc not in ("nan",""): extra.append(f" {loc}")
+                            if obs and obs not in ("nan",""): extra.append(f" {obs}")
                             if extra:
                                 st.caption(" · ".join(extra))
                         with col_btn:
@@ -501,7 +502,7 @@ with tab_sprint:
             )
             realizado = st.text_input(
                 "Realizado vs Meta",
-                placeholder="Ex: 98,7% ✅"
+                placeholder="Ex: 98,7% "
             )
             ok_sp = st.form_submit_button("Salvar Sprint", use_container_width=True, type="primary")
 
@@ -531,7 +532,7 @@ with tab_sprint:
                             "Meta":         meta,
                             "Realizado":    realizado,
                         })
-                        st.success(f"✅ Sprint de **{responsavel_sp}** ({bu}) salva!")
+                        st.success(f" Sprint de **{responsavel_sp}** ({bu}) salva!")
                         st.rerun()
 
     with col_hist:
