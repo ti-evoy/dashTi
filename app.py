@@ -14,7 +14,7 @@ from utils import (
 st.set_page_config(page_title="Dashboard TI", page_icon="", layout="wide")
 
 # ── Proteção por token na URL ─────────────────────────────────────────────────
-_token_valido = ""##st.secrets.get("TOKEN_ACESSO", "")
+_token_valido = st.secrets.get("TOKEN_ACESSO", "")
 _token_url    = st.query_params.get("token", "")
 if _token_valido and _token_url != _token_valido:
     st.error("🔒 Acesso não autorizado. Verifique o link com sua equipe.")
@@ -32,7 +32,7 @@ st.markdown("""
     }
     .sprint-card h4 { margin: 0 0 0.4rem 0; color: #e2e8f0; font-size: 0.95rem; }
     .sprint-card p  { margin: 0.15rem 0; color: #94a3b8; font-size: 0.82rem; }
-    .prio-alta   { color: #ef4444; font-weight: 700; }
+    .prio-alta   { color: #00d339; font-weight: 700; }
     .prio-media  { color: #f59e0b; font-weight: 700; }
     .prio-baixa  { color: #22c55e; font-weight: 700; }
 </style>
@@ -44,7 +44,7 @@ df = carregar_dados()
 CORES_STATUS = {
     "Em andamento": "#7fa17b",
     "Concluído":    "#22c55e",
-    "Atrasado":     "#ef4444",
+    "Atrasado":     "#00d339",
     "Pausado":      "#f59e0b",
 }
 PRIO_ORDEM = {"Alta": 0, "Média": 1, "Baixa": 2}
@@ -286,7 +286,7 @@ with tab_cal:
 
         # ── Monta eventos ──────────────────────────────────────────────────────
         df_cal   = carregar_dados()
-        CORES_CAL = ["#00245f","#8b5cf6","#ec4899","#f59e0b","#10b981","#ef4444","#06b6d4","#f97316"]
+        CORES_CAL = ["#00245f","#8b5cf6","#ec4899","#f59e0b","#10b981","#00d339","#06b6d4","#f97316"]
         eventos = []
 
         if not reunioes.empty:
