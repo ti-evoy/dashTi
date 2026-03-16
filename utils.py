@@ -281,13 +281,11 @@ def salvar_sprint(nova: dict):
     if "BU" in nova:
         nova["BU"] = _normalizar_bu(nova["BU"])
     if "Semana" in nova and hasattr(nova["Semana"], 'strftime'):
-        nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d")
+        # ✅ Força o formato com horário para o Sheets reconhecer corretamente
+        nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d 00:00:00")
 
-    # Usa _ler_sprints_raw — lê direto do Sheets sem filtrar, nunca perde dados
     df = _ler_sprints_raw()
-    # Garante que nova entrada também tem todas as colunas
     nova_completa = {col: nova.get(col, "") for col in COLUNAS_SPRINTS}
     df = pd.concat([df, pd.DataFrame([nova_completa])], ignore_index=True)
     _salvar_aba(ABA_SPRINTS, df)
-    # Invalida cache para exibir dados atualizados
     _cache_invalidar(ABA_SPRINTS)
