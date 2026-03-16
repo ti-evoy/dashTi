@@ -34,22 +34,23 @@ ETAPAS_PROJETO = [
 
 BUS_VALIDAS = ["Estratégia & Projetos", "Governança & Sustentação"]
 
-_BU_MAPA = {
-    "projetos":    "Estratégia & Projetos",
-    "estrategia":  "Estratégia & Projetos",
-    "estratégia":  "Estratégia & Projetos",
-    "governanca":  "Governança & Sustentação",
-    "governança":  "Governança & Sustentação",
-    "sustentacao": "Governança & Sustentação",
-    "sustentação": "Governança & Sustentação",
-}
-
 def _normalizar_bu(bu):
     if pd.isna(bu): return bu
     bu_str = str(bu).strip()
-    if bu_str in BUS_VALIDAS: return bu_str
-    for chave, valor in _BU_MAPA.items():
-        if chave in bu_str.lower(): return valor
+    # Checa match exato primeiro
+    if bu_str in BUS_VALIDAS:
+        return bu_str
+    # Normaliza para comparação: minúsculo + remove acentos comuns
+    bu_lower = (bu_str.lower()
+        .replace("ã", "a").replace("â", "a").replace("á", "a")
+        .replace("ç", "c").replace("ê", "e").replace("é", "e")
+        .replace("õ", "o").replace("ó", "o").replace("ú", "u")
+        .replace("í", "i").strip()
+    )
+    if "govern" in bu_lower or "sustent" in bu_lower:
+        return "Governança & Sustentação"
+    if "estrat" in bu_lower or "projeto" in bu_lower:
+        return "Estratégia & Projetos"
     return bu_str
 
 def calcular_progresso(etapas_concluidas):
@@ -133,7 +134,7 @@ def carregar_dados() -> pd.DataFrame:
         def _recalc(row):
             val = str(row.get("Etapas",""))
             if val and val not in ("nan","") and int(row.get("Progresso (%)", 0)) == 0:
-                bits  = val.split(",")
+                bits   = val.split(",")
                 feitas = sum(1 for b in bits if b.strip() == "1")
                 total  = len(ETAPAS_PROJETO)
                 return round((feitas / total) * 100)
@@ -230,6 +231,7 @@ def carregar_sprints() -> pd.DataFrame:
             # ✅ Remove linhas com data inválida (NaT) para evitar crash no strftime
             df = df.dropna(subset=["Semana"])
         if "BU" in df.columns:
+            # ✅ Normalização robusta — cobre variações de acento e encoding
             df["BU"] = df["BU"].apply(_normalizar_bu)
         return df
     except Exception as e:
