@@ -243,4 +243,4 @@ def salvar_sprint(nova: dict):
         nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d")
     df = carregar_sprints()
     df = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
-    _salvar_aba(ABA_SPRINTS, df)github
+    _salvar_aba(ABA_SPRINTS, df)
