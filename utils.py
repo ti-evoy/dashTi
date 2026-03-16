@@ -34,11 +34,6 @@ ETAPAS_PROJETO = [
 
 BUS_VALIDAS = ["Estratégia & Projetos", "Governança & Sustentação"]
 
-COLUNAS_SPRINTS = [
-    "Semana", "BU", "Responsável", "Progressos",
-    "Desafios", "Próxima Sprint", "Meta", "Realizado"
-]
-
 def _normalizar_bu(bu):
     if pd.isna(bu): return bu
     bu_str = str(bu).strip()
@@ -94,12 +89,6 @@ def _cache_get(aba: str):
 def _cache_set(aba: str, df: pd.DataFrame, ttl: int = _CACHE_TTL_SEGUNDOS):
     st.session_state[_cache_key(aba)]    = df.copy()
     st.session_state[_cache_ts_key(aba)] = datetime.now()
-
-def _cache_invalidar(aba: str):
-    if _cache_key(aba) in st.session_state:
-        del st.session_state[_cache_key(aba)]
-    if _cache_ts_key(aba) in st.session_state:
-        del st.session_state[_cache_ts_key(aba)]
 
 def _ler_aba(aba: str) -> pd.DataFrame:
     cached = _cache_get(aba)
@@ -228,48 +217,44 @@ def proxima_segunda():
 
 def _ler_sprints_raw() -> pd.DataFrame:
     """
-    Lê a aba sprints direto do Sheets SEM cache e SEM filtrar linhas.
-    Garante todas as colunas existam. Usado pelo fluxo de salvamento.
+    Lê a aba sprints do Sheets SEM filtrar nenhuma linha.
+    Usado exclusivamente pelo fluxo de salvamento para não perder dados.
     """
     ws   = _get_sheet(ABA_SPRINTS)
-    data = ws.get_all_records(expected_headers=COLUNAS_SPRINTS)
+    data = ws.get_all_records()
     if not data:
-        return pd.DataFrame(columns=COLUNAS_SPRINTS)
+        return pd.DataFrame(columns=[
+            "Semana","BU","Responsável","Progressos","Desafios",
+            "Próxima Sprint","Meta","Realizado"
+        ])
     df = pd.DataFrame(data)
-    # Garante que todas as colunas existam
-    for col in COLUNAS_SPRINTS:
-        if col not in df.columns:
-            df[col] = ""
-    df = df[COLUNAS_SPRINTS]  # ordena colunas corretamente
-    # Remove apenas linhas onde Semana E Responsável estão vazios (lixo real)
-    df = df[~((df["Semana"].astype(str).str.strip() == "") &
-              (df["Responsável"].astype(str).str.strip() == ""))]
-    return df.reset_index(drop=True)
+    # Remove apenas linhas 100% vazias (linhas em branco do Sheets)
+    df = df.replace("", pd.NA).dropna(how="all").fillna("")
+    return df
 
 def carregar_sprints() -> pd.DataFrame:
     """
-    Lê e prepara sprints para EXIBIÇÃO via cache.
-    Normaliza BU e datas sem descartar linhas válidas.
+    Lê e prepara sprints para EXIBIÇÃO.
+    Normaliza BU e datas, mas não descarta linhas — apenas converte tipos.
     """
     try:
         df = _ler_aba(ABA_SPRINTS)
         if df.empty:
-            return pd.DataFrame(columns=COLUNAS_SPRINTS)
+            return pd.DataFrame(columns=[
+                "Semana","BU","Responsável","Progressos","Desafios",
+                "Próxima Sprint","Meta","Realizado"
+            ])
 
-        # Garante todas as colunas
-        for col in COLUNAS_SPRINTS:
-            if col not in df.columns:
-                df[col] = ""
-
-        # Remove linhas onde Semana E Responsável estão vazios
-        df = df[~((df["Semana"].astype(str).str.strip() == "") &
-                  (df["Responsável"].astype(str).str.strip() == ""))]
+        # Remove linhas 100% vazias vindas do Sheets
+        df = df.replace("", pd.NA).dropna(how="all").fillna("")
 
         if "Semana" in df.columns:
             df["Semana"] = pd.to_datetime(df["Semana"], errors="coerce")
+            # Remove só linhas onde Semana é realmente inválida (NaT)
             df = df.dropna(subset=["Semana"])
 
         if "BU" in df.columns:
+            # Normaliza BU sem descartar — se não mapear, mantém o valor original
             df["BU"] = df["BU"].apply(_normalizar_bu)
 
         return df.reset_index(drop=True)
@@ -283,11 +268,10 @@ def salvar_sprint(nova: dict):
     if "Semana" in nova and hasattr(nova["Semana"], 'strftime'):
         nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d")
 
-    # Usa _ler_sprints_raw — lê direto do Sheets sem filtrar, nunca perde dados
+    # ✅ Usa _ler_sprints_raw para salvar — nunca perde linhas existentes
     df = _ler_sprints_raw()
-    # Garante que nova entrada também tem todas as colunas
-    nova_completa = {col: nova.get(col, "") for col in COLUNAS_SPRINTS}
-    df = pd.concat([df, pd.DataFrame([nova_completa])], ignore_index=True)
+    df = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
     _salvar_aba(ABA_SPRINTS, df)
-    # Invalida cache para exibir dados atualizados
-    _cache_invalidar(ABA_SPRINTS)
+    # Invalida cache para forçar releitura na próxima exibição
+    if _cache_key(ABA_SPRINTS) in st.session_state:
+        del st.session_state[_cache_key(ABA_SPRINTS)]
