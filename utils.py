@@ -226,14 +226,24 @@ def carregar_sprints() -> pd.DataFrame:
                 "Semana","BU","Responsável","Progressos","Desafios",
                 "Próxima Sprint","Meta","Realizado"
             ])
+
+        # ✅ Remove linhas completamente vazias (linhas em branco do Sheets)
+        df = df.replace("", pd.NA)
+        df = df.dropna(how="all")
+        df = df.fillna("")
+
         if "Semana" in df.columns:
             df["Semana"] = pd.to_datetime(df["Semana"], errors="coerce")
-            # ✅ Remove linhas com data inválida (NaT) para evitar crash no strftime
+            # ✅ Remove linhas com data inválida (NaT)
             df = df.dropna(subset=["Semana"])
+
         if "BU" in df.columns:
-            # ✅ Normalização robusta — cobre variações de acento e encoding
+            # ✅ Normalização robusta — cobre variações de acento, encoding e espaços
             df["BU"] = df["BU"].apply(_normalizar_bu)
-        return df
+            # ✅ Remove linhas cuja BU não mapeou para nenhuma BU válida
+            df = df[df["BU"].isin(BUS_VALIDAS)]
+
+        return df.reset_index(drop=True)
     except Exception as e:
         st.error(f"Erro ao carregar sprints: {e}")
         return pd.DataFrame()
