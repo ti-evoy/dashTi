@@ -37,10 +37,8 @@ BUS_VALIDAS = ["Estratégia & Projetos", "Governança & Sustentação"]
 def _normalizar_bu(bu):
     if pd.isna(bu): return bu
     bu_str = str(bu).strip()
-    # Checa match exato primeiro
     if bu_str in BUS_VALIDAS:
         return bu_str
-    # Normaliza para comparação: minúsculo + remove acentos comuns
     bu_lower = (bu_str.lower()
         .replace("ã", "a").replace("â", "a").replace("á", "a")
         .replace("ç", "c").replace("ê", "e").replace("é", "e")
@@ -69,7 +67,7 @@ def _get_sheet(aba: str):
     sh = client.open_by_key(sheet_id)
     return sh.worksheet(aba)
 
-# ── Cache com session_state para evitar releituras imediatas após salvar ──────
+# ── Cache com session_state ───────────────────────────────────────────────────
 _CACHE_TTL_SEGUNDOS = 30
 _CACHE_POS_SAVE_TTL = 20
 
@@ -96,7 +94,6 @@ def _ler_aba(aba: str) -> pd.DataFrame:
     cached = _cache_get(aba)
     if cached is not None:
         return cached
-
     ws   = _get_sheet(aba)
     data = ws.get_all_records()
     df   = pd.DataFrame(data) if data else pd.DataFrame()
@@ -218,7 +215,28 @@ def proxima_segunda():
     dias = (7 - hoje.weekday()) % 7
     return hoje + timedelta(days=dias if dias != 0 else 7)
 
+def _ler_sprints_raw() -> pd.DataFrame:
+    """
+    Lê a aba sprints do Sheets SEM filtrar nenhuma linha.
+    Usado exclusivamente pelo fluxo de salvamento para não perder dados.
+    """
+    ws   = _get_sheet(ABA_SPRINTS)
+    data = ws.get_all_records()
+    if not data:
+        return pd.DataFrame(columns=[
+            "Semana","BU","Responsável","Progressos","Desafios",
+            "Próxima Sprint","Meta","Realizado"
+        ])
+    df = pd.DataFrame(data)
+    # Remove apenas linhas 100% vazias (linhas em branco do Sheets)
+    df = df.replace("", pd.NA).dropna(how="all").fillna("")
+    return df
+
 def carregar_sprints() -> pd.DataFrame:
+    """
+    Lê e prepara sprints para EXIBIÇÃO.
+    Normaliza BU e datas, mas não descarta linhas — apenas converte tipos.
+    """
     try:
         df = _ler_aba(ABA_SPRINTS)
         if df.empty:
@@ -227,21 +245,17 @@ def carregar_sprints() -> pd.DataFrame:
                 "Próxima Sprint","Meta","Realizado"
             ])
 
-        # ✅ Remove linhas completamente vazias (linhas em branco do Sheets)
-        df = df.replace("", pd.NA)
-        df = df.dropna(how="all")
-        df = df.fillna("")
+        # Remove linhas 100% vazias vindas do Sheets
+        df = df.replace("", pd.NA).dropna(how="all").fillna("")
 
         if "Semana" in df.columns:
             df["Semana"] = pd.to_datetime(df["Semana"], errors="coerce")
-            # ✅ Remove linhas com data inválida (NaT)
+            # Remove só linhas onde Semana é realmente inválida (NaT)
             df = df.dropna(subset=["Semana"])
 
         if "BU" in df.columns:
-            # ✅ Normalização robusta — cobre variações de acento, encoding e espaços
+            # Normaliza BU sem descartar — se não mapear, mantém o valor original
             df["BU"] = df["BU"].apply(_normalizar_bu)
-            # ✅ Remove linhas cuja BU não mapeou para nenhuma BU válida
-            df = df[df["BU"].isin(BUS_VALIDAS)]
 
         return df.reset_index(drop=True)
     except Exception as e:
@@ -253,6 +267,11 @@ def salvar_sprint(nova: dict):
         nova["BU"] = _normalizar_bu(nova["BU"])
     if "Semana" in nova and hasattr(nova["Semana"], 'strftime'):
         nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d")
-    df = carregar_sprints()
+
+    # ✅ Usa _ler_sprints_raw para salvar — nunca perde linhas existentes
+    df = _ler_sprints_raw()
     df = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
     _salvar_aba(ABA_SPRINTS, df)
+    # Invalida cache para forçar releitura na próxima exibição
+    if _cache_key(ABA_SPRINTS) in st.session_state:
+        del st.session_state[_cache_key(ABA_SPRINTS)]
