@@ -69,8 +69,8 @@ def _get_sheet(aba: str):
     return sh.worksheet(aba)
 
 # ── Cache com session_state para evitar releituras imediatas após salvar ──────
-_CACHE_TTL_SEGUNDOS = 30   # tempo que o cache local dura após uma leitura normal
-_CACHE_POS_SAVE_TTL = 20   # tempo que o cache local dura após um salvamento
+_CACHE_TTL_SEGUNDOS = 30
+_CACHE_POS_SAVE_TTL = 20
 
 def _cache_key(aba):
     return f"__aba_cache_{aba}"
@@ -79,7 +79,6 @@ def _cache_ts_key(aba):
     return f"__aba_cache_ts_{aba}"
 
 def _cache_get(aba: str):
-    """Retorna DataFrame do cache local se ainda válido, senão None."""
     key    = _cache_key(aba)
     ts_key = _cache_ts_key(aba)
     if key in st.session_state and ts_key in st.session_state:
@@ -89,16 +88,10 @@ def _cache_get(aba: str):
     return None
 
 def _cache_set(aba: str, df: pd.DataFrame, ttl: int = _CACHE_TTL_SEGUNDOS):
-    """Salva DataFrame no cache local do session_state."""
     st.session_state[_cache_key(aba)]    = df.copy()
     st.session_state[_cache_ts_key(aba)] = datetime.now()
 
 def _ler_aba(aba: str) -> pd.DataFrame:
-    """
-    Lê uma aba do Google Sheets.
-    Primeiro verifica o cache local (session_state) para evitar
-    múltiplas chamadas à API em sequência e o erro 429.
-    """
     cached = _cache_get(aba)
     if cached is not None:
         return cached
@@ -110,12 +103,6 @@ def _ler_aba(aba: str) -> pd.DataFrame:
     return df
 
 def _salvar_aba(aba: str, df: pd.DataFrame):
-    """
-    Sobrescreve a aba inteira com o DataFrame.
-    Atualiza o cache local com os dados recém-salvos
-    em vez de limpar o cache — isso evita releitura imediata
-    e o consequente erro 429.
-    """
     ws  = _get_sheet(aba)
     df2 = df.copy()
     for col in df2.columns:
@@ -124,9 +111,6 @@ def _salvar_aba(aba: str, df: pd.DataFrame):
     df2 = df2.fillna("").astype(str)
     ws.clear()
     ws.update([df2.columns.tolist()] + df2.values.tolist())
-
-    # ✅ Atualiza cache com os dados que acabamos de salvar
-    # (sem bater na API de novo) — e renova o TTL
     _cache_set(aba, df, ttl=_CACHE_POS_SAVE_TTL)
 
 # ── Projetos ──────────────────────────────────────────────────────────────────
@@ -243,6 +227,8 @@ def carregar_sprints() -> pd.DataFrame:
             ])
         if "Semana" in df.columns:
             df["Semana"] = pd.to_datetime(df["Semana"], errors="coerce")
+            # ✅ Remove linhas com data inválida (NaT) para evitar crash no strftime
+            df = df.dropna(subset=["Semana"])
         if "BU" in df.columns:
             df["BU"] = df["BU"].apply(_normalizar_bu)
         return df
@@ -257,4 +243,4 @@ def salvar_sprint(nova: dict):
         nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d")
     df = carregar_sprints()
     df = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
-    _salvar_aba(ABA_SPRINTS, df)
+    _salvar_aba(ABA_SPRINTS, df)github
