@@ -34,13 +34,16 @@ ETAPAS_PROJETO = [
 
 BUS_VALIDAS = ["Estratégia & Projetos", "Governança & Sustentação"]
 
+COLUNAS_SPRINTS = [
+    "Semana", "BU", "Responsável", "Progressos",
+    "Desafios", "Próxima Sprint", "Meta", "Realizado"
+]
+
 def _normalizar_bu(bu):
     if pd.isna(bu): return bu
     bu_str = str(bu).strip()
-    # Checa match exato primeiro
     if bu_str in BUS_VALIDAS:
         return bu_str
-    # Normaliza para comparação: minúsculo + remove acentos comuns
     bu_lower = (bu_str.lower()
         .replace("ã", "a").replace("â", "a").replace("á", "a")
         .replace("ç", "c").replace("ê", "e").replace("é", "e")
@@ -69,7 +72,7 @@ def _get_sheet(aba: str):
     sh = client.open_by_key(sheet_id)
     return sh.worksheet(aba)
 
-# ── Cache com session_state para evitar releituras imediatas após salvar ──────
+# ── Cache com session_state ───────────────────────────────────────────────────
 _CACHE_TTL_SEGUNDOS = 30
 _CACHE_POS_SAVE_TTL = 20
 
@@ -92,11 +95,16 @@ def _cache_set(aba: str, df: pd.DataFrame, ttl: int = _CACHE_TTL_SEGUNDOS):
     st.session_state[_cache_key(aba)]    = df.copy()
     st.session_state[_cache_ts_key(aba)] = datetime.now()
 
+def _cache_invalidar(aba: str):
+    if _cache_key(aba) in st.session_state:
+        del st.session_state[_cache_key(aba)]
+    if _cache_ts_key(aba) in st.session_state:
+        del st.session_state[_cache_ts_key(aba)]
+
 def _ler_aba(aba: str) -> pd.DataFrame:
     cached = _cache_get(aba)
     if cached is not None:
         return cached
-
     ws   = _get_sheet(aba)
     data = ws.get_all_records()
     df   = pd.DataFrame(data) if data else pd.DataFrame()
@@ -218,30 +226,51 @@ def proxima_segunda():
     dias = (7 - hoje.weekday()) % 7
     return hoje + timedelta(days=dias if dias != 0 else 7)
 
+def _ler_sprints_raw() -> pd.DataFrame:
+    """
+    Lê a aba sprints direto do Sheets SEM cache e SEM filtrar linhas.
+    Garante todas as colunas existam. Usado pelo fluxo de salvamento.
+    """
+    ws   = _get_sheet(ABA_SPRINTS)
+    data = ws.get_all_records(expected_headers=COLUNAS_SPRINTS)
+    if not data:
+        return pd.DataFrame(columns=COLUNAS_SPRINTS)
+    df = pd.DataFrame(data)
+    # Garante que todas as colunas existam
+    for col in COLUNAS_SPRINTS:
+        if col not in df.columns:
+            df[col] = ""
+    df = df[COLUNAS_SPRINTS]  # ordena colunas corretamente
+    # Remove apenas linhas onde Semana E Responsável estão vazios (lixo real)
+    df = df[~((df["Semana"].astype(str).str.strip() == "") &
+              (df["Responsável"].astype(str).str.strip() == ""))]
+    return df.reset_index(drop=True)
+
 def carregar_sprints() -> pd.DataFrame:
+    """
+    Lê e prepara sprints para EXIBIÇÃO via cache.
+    Normaliza BU e datas sem descartar linhas válidas.
+    """
     try:
         df = _ler_aba(ABA_SPRINTS)
         if df.empty:
-            return pd.DataFrame(columns=[
-                "Semana","BU","Responsável","Progressos","Desafios",
-                "Próxima Sprint","Meta","Realizado"
-            ])
+            return pd.DataFrame(columns=COLUNAS_SPRINTS)
 
-        # ✅ Remove linhas completamente vazias (linhas em branco do Sheets)
-        df = df.replace("", pd.NA)
-        df = df.dropna(how="all")
-        df = df.fillna("")
+        # Garante todas as colunas
+        for col in COLUNAS_SPRINTS:
+            if col not in df.columns:
+                df[col] = ""
+
+        # Remove linhas onde Semana E Responsável estão vazios
+        df = df[~((df["Semana"].astype(str).str.strip() == "") &
+                  (df["Responsável"].astype(str).str.strip() == ""))]
 
         if "Semana" in df.columns:
             df["Semana"] = pd.to_datetime(df["Semana"], errors="coerce")
-            # ✅ Remove linhas com data inválida (NaT)
             df = df.dropna(subset=["Semana"])
 
         if "BU" in df.columns:
-            # ✅ Normalização robusta — cobre variações de acento, encoding e espaços
             df["BU"] = df["BU"].apply(_normalizar_bu)
-            # ✅ Remove linhas cuja BU não mapeou para nenhuma BU válida
-            df = df[df["BU"].isin(BUS_VALIDAS)]
 
         return df.reset_index(drop=True)
     except Exception as e:
@@ -253,6 +282,12 @@ def salvar_sprint(nova: dict):
         nova["BU"] = _normalizar_bu(nova["BU"])
     if "Semana" in nova and hasattr(nova["Semana"], 'strftime'):
         nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d")
-    df = carregar_sprints()
-    df = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
+
+    # Usa _ler_sprints_raw — lê direto do Sheets sem filtrar, nunca perde dados
+    df = _ler_sprints_raw()
+    # Garante que nova entrada também tem todas as colunas
+    nova_completa = {col: nova.get(col, "") for col in COLUNAS_SPRINTS}
+    df = pd.concat([df, pd.DataFrame([nova_completa])], ignore_index=True)
     _salvar_aba(ABA_SPRINTS, df)
+    # Invalida cache para exibir dados atualizados
+    _cache_invalidar(ABA_SPRINTS)
