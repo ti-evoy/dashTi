@@ -142,11 +142,15 @@ def carregar_dados() -> pd.DataFrame:
         def _recalc(row):
             val = str(row.get("Etapas",""))
             if val and val not in ("nan","") and int(row.get("Progresso (%)", 0)) == 0:
-                bits   = val.split(",")
-                feitas = sum(1 for b in bits if b.strip() == "1")
-                total  = len(ETAPAS_PROJETO)
-                return round((feitas / total) * 100)
+                if "," in val:
+                    bits = val.split(",")
+                else:
+                    bits = list(val.strip())
+                    feitas = sum(1 for b in bits if b.strip() == "1")
+                    total  = len(ETAPAS_PROJETO)
+                    return round((feitas / total) * 100)
             return row.get("Progresso (%)", 0)
+
 
         df["Progresso (%)"] = df.apply(_recalc, axis=1)
         return df
@@ -176,11 +180,15 @@ def atualizar_etapas(idx, etapas):
 def get_etapas(row):
     val = str(row.get("Etapas",""))
     if val and val != "nan":
-        bits   = val.split(",")
-        result = [b.strip()=="1" for b in bits]
+        # Suporta "1,1,0,0" e "11000000"
+        if "," in val:
+            bits = val.split(",")
+        else:
+            bits = list(val.strip())
+        result = [b.strip() == "1" for b in bits]
         while len(result) < len(ETAPAS_PROJETO): result.append(False)
         return result[:len(ETAPAS_PROJETO)]
-    return [False]*len(ETAPAS_PROJETO)
+    return [False] * len(ETAPAS_PROJETO)
 
 def projetos_atrasados(df):
     hoje = pd.Timestamp(datetime.today().date())

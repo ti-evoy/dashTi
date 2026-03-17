@@ -5,3 +5,5 @@ openpyxl
 streamlit-calendar
 gspread
 google-auth
+openai
+pymupdf

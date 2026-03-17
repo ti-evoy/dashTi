@@ -1,0 +1,14 @@
+sheet_id = "1Y1on5khmv7yQTN6ws9lN3pp_mtliP4cYQyqhwV-tbgw"
+access_token = "reclamaevoy@2026"
+
+[gcp_service_account]
+type = "service_account"
+project_id = "reclamacoes-app"
+private_key_id = "61b0c33cbd4301bb00683a44e8745a8d38a1f904"
+private_key = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDvQdVpjhE55Cf0\nTLfVINmH7cEPSRkyXzCTXYgUnru6Rv3Dgt18Nfe+wX2ajqlfbvyB70DIm0K8j+gL\nMjln5yhPl+6xqoSXE1kMVKaoNvZjeJU8EpEM9wBtYU02qsX6umINijqmmO5H0z10\nRO3MYzB/F9vmN3coxaWDNRtFBSx3RIzHKih+4j6gT0unL+/44X+DqUqK6eVbqEMf\nwDDPzWXwuuHF/CIoUxZflu9rfvH/26AyqqzNkm0Fo7v8W9wCeEEvrrw3K5dJe+Ad\nCh/xGLLTOjYtyuSwMJ7AVKBbDa0+K6UmlvjkyCTcrC6m3d5QacvW0CT8FrdPE8vL\n4m1WRfCbAgMBAAECggEATG5zhqzjw+KnANwhPeyokUvaiM+JRRYzpmASwMOUpQVY\nu8RqjOuQoVeekGlSojIKaFfOEkfHIgW20xzQSekGb6bRkeAvSzPbFp1UQBiOzWgQ\nBIjJ3aJqeIbE69nSNS6ldD3cTqw8MqXA1AvRC6IENBWjIgBGCLhbD3c/puToN5EI\naCLeOfNQJLibURfxHuK0F5cHPLNTBK6MWM9LybMEzAY9Fpl/Aba4NUSassjrYUK3\nAg4t6H+rLJ/XuSF4678ijIehMCkYVK/G64HqugQpj6j9B+oa6pw2HpvPmABTziu2\n1g4ng+/18S2EKmldX6MXuwyWKhN4bKzRy6aL99dcQQKBgQD4U6AzXPpUrYv9D5bf\ntdWQZz+B0jLX9cmT7z+LEKW0WzZERE5ktjGzJKahnXEUstvJIztI9xPd26KHFGYn\nTeU4diU9f5dQTQa9pBQw5dGGTFERky6SZz23Fe/WHmADmvorQyTlUx0aVzLJSIsI\nWa0uPlsR3to8+tD2GmxPWIUohwKBgQD2pnbN8dtE7BoTGHzEEq0CpbeRHPOCfZ8W\nZkKSdq7/83zfrD+fLfnxHwAmyArzxe46la5jRGDGxbNJiNy8d6FvS48APGS61Z71\nViA25SQcJNypiG0i+rOz+yvIItq2Rl26beaDpbpgTBu3DPdG75cPSY9fuaIunPn5\n4a700/FATQKBgBk2dGeCozABxtrUwF7KWXql4P7PVrYykFriybLW59wd/q6DuOnk\nzbsAl6KFF7wgRMxxNU29OFkoOaI5Yf3PnNxUsodB8x0GFQ8gH6SvUMyv5vM/3FSl\nAtEZ+xXkU59KFuhZkt9txuCrxc5F/UfFwx2U2y4/UC0s0haKrECKHkr1AoGAFtJw\nS74FO+tcvkeVw862k3gh9BtprLlS7w+nOUYiCyzMcSXO/TuT1Ou5Z906pjO6R1Fy\nQV0iV0ITxMoVIpsvJM0o/iyYZXE+tBS0BmBNZw1CHa2x63qnBhBHjM0sz5DTO1zP\n535+MErahaV9e+LPZ2q3CXRzvTxpJOXs+lpiCEECgYEAsQJot48fG75hZuyodWt5\nJxuhvSQQYbZeuPKa2p9rx2jhn3+Do7qzpdcw/LglCc4FOKe6ZYIHSxqhJYvjbu43\nWfV4g5XeAHEnYTMLpOZUtc19gx9Ym5uR6HJPEh4iBMiM6wJHIsjDeagAjJ99rq+l\n43aGcLEbfE4kq1hpYG+uMEQ=\n-----END PRIVATE KEY-----\n"
+client_email = "app-reclamacoes@reclamacoes-app.iam.gserviceaccount.com"
+client_id = "114616497238446996086"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/app-reclamacoes%40reclamacoes-app.iam.gserviceaccount.com"

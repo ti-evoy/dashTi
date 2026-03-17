@@ -14,7 +14,7 @@ from utils import (
 st.set_page_config(page_title="Dashboard TI", page_icon="", layout="wide")
 
 # ── Proteção por token na URL ─────────────────────────────────────────────────
-_token_valido = st.secrets.get("TOKEN_ACESSO", "")
+_token_valido = ""#st.secrets.get("TOKEN_ACESSO", "")
 _token_url    = st.query_params.get("token", "")
 if _token_valido and _token_url != _token_valido:
     st.error("🔒 Acesso não autorizado. Verifique o link com sua equipe.")
@@ -83,6 +83,18 @@ st.markdown("""
     input[type="checkbox"]:checked + div,
     [data-testid="stCheckbox"] svg { color: #00d339 !important; fill: #00d339 !important; }
     [data-baseweb="checkbox"] [data-checked="true"] { background-color: #00d339 !important; border-color: #00d339 !important; }
+
+    /* ── Chat IA ── */
+    .ia-chat-user {
+        background: #1e293b; border-radius: 10px; padding: 0.7rem 1rem;
+        margin-bottom: 0.5rem; border-left: 3px solid #3b82f6;
+    }
+    .ia-chat-bot {
+        background: #0d2212; border-radius: 10px; padding: 0.7rem 1rem;
+        margin-bottom: 0.5rem; border-left: 3px solid #00d339;
+    }
+    .ia-chat-label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 3px; }
+    .ia-chat-label-bot { font-size: 0.8rem; color: #5a7d60; margin-bottom: 3px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -132,8 +144,8 @@ if "Progresso (%)" in df_filtrado.columns:
     df_filtrado = df_filtrado[df_filtrado["Progresso (%)"].between(progresso_range[0], progresso_range[1])]
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_dash, tab_projetos, tab_novo, tab_cal, tab_sprint = st.tabs([
-    "Dashboard", "Projetos", "Novo Projeto", "Calendário", "Sprint"
+tab_dash, tab_projetos, tab_novo, tab_cal, tab_sprint, tab_ia = st.tabs([
+    "Dashboard", "Projetos", "Novo Projeto", "Calendário", "Sprint", "IA do TI"
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -606,7 +618,6 @@ with tab_sprint:
             else:
                 st.caption(f"{len(df_hist)} sprint(s) encontrada(s)")
                 for _, sp in df_hist.iterrows():
-                    # ✅ CORREÇÃO: protege contra NaT antes de chamar strftime
                     semana_ts  = pd.to_datetime(sp["Semana"])
                     semana_str = semana_ts.strftime("%d/%m/%Y") if not pd.isnull(semana_ts) else "—"
                     is_atual   = (not pd.isnull(semana_ts)) and semana_ts.date() == seg_atual
@@ -634,3 +645,4 @@ with tab_sprint:
                             for linha in str(sp.get("Próxima Sprint","")).split("\n"):
                                 if linha.strip():
                                     st.markdown(f"- {linha.strip().lstrip('-').strip()}")
+
