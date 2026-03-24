@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import json
+import uuid
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, date, timedelta
@@ -20,6 +21,16 @@ ABA_CHAMADOS  = "chamados"
 ARQUIVO_LOCAL_PROJETOS  = "data/projetos.xlsx"
 ARQUIVO_LOCAL_REUNIOES  = "data/reunioes.xlsx"
 ARQUIVO_LOCAL_SPRINTS   = "data/sprints_db.xlsx"
+
+COLUNAS_PROJETOS = [
+    "ID", "Projeto", "Responsável", "Prioridade", "Status", "Progresso (%)",
+    "Etapas", "Início", "Prazo", "Horas Gastas", "Descrição"
+]
+
+COLUNAS_REUNIOES = [
+    "Título", "Responsável", "Participantes", "Empresa",
+    "Data", "Horário", "Local", "Observações"
+]
 
 # ── Checkboxes de progresso ───────────────────────────────────────────────────
 ETAPAS_PROJETO = [
@@ -66,6 +77,16 @@ def _normalizar_bu(bu):
 
 def calcular_progresso(etapas_concluidas):
     return round((sum(etapas_concluidas) / len(ETAPAS_PROJETO)) * 100)
+
+def _gerar_id(prefixo: str) -> str:
+    return f"{prefixo}-{uuid.uuid4().hex[:8].upper()}"
+
+def _garantir_colunas(df: pd.DataFrame, colunas: list[str]) -> pd.DataFrame:
+    df2 = df.copy()
+    for col in colunas:
+        if col not in df2.columns:
+            df2[col] = ""
+    return df2[colunas]
 
 # ── Conexão Google Sheets ─────────────────────────────────────────────────────
 @st.cache_resource
@@ -114,10 +135,11 @@ def _cache_invalidar(aba: str):
     if _cache_ts_key(aba) in st.session_state:
         del st.session_state[_cache_ts_key(aba)]
 
-def _ler_aba(aba: str) -> pd.DataFrame:
-    cached = _cache_get(aba)
-    if cached is not None:
-        return cached
+def _ler_aba(aba: str, use_cache: bool = True) -> pd.DataFrame:
+    if use_cache:
+        cached = _cache_get(aba)
+        if cached is not None:
+            return cached
     ws   = _get_sheet(aba)
     data = ws.get_all_records()
     df   = pd.DataFrame(data) if data else pd.DataFrame()
@@ -136,14 +158,19 @@ def _salvar_aba(aba: str, df: pd.DataFrame):
     _cache_set(aba, df, ttl=_CACHE_POS_SAVE_TTL)
 
 # ── Projetos ──────────────────────────────────────────────────────────────────
-def carregar_dados() -> pd.DataFrame:
+def carregar_dados(use_cache: bool = True) -> pd.DataFrame:
     try:
-        df = _ler_aba(ABA_PROJETOS)
+        df = _ler_aba(ABA_PROJETOS, use_cache=use_cache)
         if df.empty:
-            return pd.DataFrame(columns=[
-                "Projeto","Responsável","Prioridade","Status","Progresso (%)",
-                "Etapas","Início","Prazo","Horas Gastas","Descrição"
-            ])
+            return pd.DataFrame(columns=COLUNAS_PROJETOS)
+
+        mudou_schema = False
+        if "ID" not in df.columns:
+            df["ID"] = [f"PRJ-{i+1:04d}" for i in range(len(df))]
+            mudou_schema = True
+
+        df = _garantir_colunas(df, COLUNAS_PROJETOS)
+
         for col in ["Início","Prazo"]:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], errors="coerce")
@@ -165,36 +192,50 @@ def carregar_dados() -> pd.DataFrame:
             return row.get("Progresso (%)", 0)
 
         df["Progresso (%)"] = df.apply(_recalc, axis=1)
+        if mudou_schema:
+            _salvar_aba(ABA_PROJETOS, df)
         return df
     except Exception as e:
         st.error(f"Erro ao carregar projetos: {e}")
         return pd.DataFrame()
 
 def salvar_projeto(novo: dict):
-    df = carregar_dados()
+    df = carregar_dados(use_cache=False)
     novo_formatado = novo.copy()
+    if "ID" not in novo_formatado or not novo_formatado["ID"]:
+        novo_formatado["ID"] = _gerar_id("PRJ")
     for col in ["Início","Prazo"]:
         if col in novo_formatado and hasattr(novo_formatado[col], 'strftime'):
             novo_formatado[col] = novo_formatado[col].strftime("%Y-%m-%d")
+    novo_formatado = {col: novo_formatado.get(col, "") for col in COLUNAS_PROJETOS}
+    df = _garantir_colunas(df, COLUNAS_PROJETOS)
     df = pd.concat([df, pd.DataFrame([novo_formatado])], ignore_index=True)
     _salvar_aba(ABA_PROJETOS, df)
 
-def atualizar_projeto(idx: int, dados: dict):
-    """Atualiza campos de um projeto existente pelo índice."""
-    df = carregar_dados().reset_index(drop=True)
+def atualizar_projeto(projeto_id: str, dados: dict):
+    """Atualiza campos de um projeto existente pelo ID."""
+    df = carregar_dados(use_cache=False).reset_index(drop=True)
+    mask = df["ID"].astype(str) == str(projeto_id)
+    if not mask.any():
+        return
+    idx = df.index[mask][0]
     for campo, valor in dados.items():
         if campo in df.columns:
             df.at[idx, campo] = valor
     _salvar_aba(ABA_PROJETOS, df)
 
-def deletar_projeto(idx: int):
-    """Remove um projeto pelo índice."""
-    df = carregar_dados().reset_index(drop=True)
-    df = df.drop(index=idx).reset_index(drop=True)
+def deletar_projeto(projeto_id: str):
+    """Remove um projeto pelo ID."""
+    df = carregar_dados(use_cache=False).reset_index(drop=True)
+    df = df[df["ID"].astype(str) != str(projeto_id)].reset_index(drop=True)
     _salvar_aba(ABA_PROJETOS, df)
 
-def atualizar_etapas(idx, etapas):
-    df = carregar_dados().reset_index(drop=True)
+def atualizar_etapas(projeto_id: str, etapas):
+    df = carregar_dados(use_cache=False).reset_index(drop=True)
+    mask = df["ID"].astype(str) == str(projeto_id)
+    if not mask.any():
+        return
+    idx = df.index[mask][0]
     etapas_str = ",".join(["1" if e else "0" for e in etapas])
     progresso  = calcular_progresso(etapas)
     df.at[idx, "Etapas"]        = etapas_str
@@ -221,14 +262,12 @@ def projetos_atrasados(df):
     return df[mask]
 
 # ── Reuniões ──────────────────────────────────────────────────────────────────
-def carregar_reunioes() -> pd.DataFrame:
+def carregar_reunioes(use_cache: bool = True) -> pd.DataFrame:
     try:
-        df = _ler_aba(ABA_REUNIOES)
+        df = _ler_aba(ABA_REUNIOES, use_cache=use_cache)
         if df.empty:
-            return pd.DataFrame(columns=[
-                "Título","Responsável","Participantes","Empresa",
-                "Data","Horário","Local","Observações"
-            ])
+            return pd.DataFrame(columns=COLUNAS_REUNIOES)
+        df = _garantir_colunas(df, COLUNAS_REUNIOES)
         if "Data" in df.columns:
             df["Data"] = pd.to_datetime(df["Data"], errors="coerce")
         return df.reset_index(drop=True)
@@ -237,15 +276,17 @@ def carregar_reunioes() -> pd.DataFrame:
         return pd.DataFrame()
 
 def salvar_reuniao(nova: dict):
-    df = carregar_reunioes()
+    df = carregar_reunioes(use_cache=False)
     nova_fmt = nova.copy()
     if "Data" in nova_fmt and hasattr(nova_fmt["Data"], 'strftime'):
         nova_fmt["Data"] = nova_fmt["Data"].strftime("%Y-%m-%d")
+    nova_fmt = {col: nova_fmt.get(col, "") for col in COLUNAS_REUNIOES}
+    df = _garantir_colunas(df, COLUNAS_REUNIOES)
     df = pd.concat([df, pd.DataFrame([nova_fmt])], ignore_index=True)
     _salvar_aba(ABA_REUNIOES, df)
 
 def deletar_reuniao(index: int):
-    df = carregar_reunioes()
+    df = carregar_reunioes(use_cache=False)
     df = df.drop(index=index).reset_index(drop=True)
     _salvar_aba(ABA_REUNIOES, df)
 
@@ -273,9 +314,9 @@ def _ler_sprints_raw() -> pd.DataFrame:
               (df["Responsável"].astype(str).str.strip() == ""))]
     return df.reset_index(drop=True)
 
-def carregar_sprints() -> pd.DataFrame:
+def carregar_sprints(use_cache: bool = True) -> pd.DataFrame:
     try:
-        df = _ler_aba(ABA_SPRINTS)
+        df = _ler_aba(ABA_SPRINTS, use_cache=use_cache)
         if df.empty:
             return pd.DataFrame(columns=COLUNAS_SPRINTS)
         for col in COLUNAS_SPRINTS:
@@ -298,7 +339,7 @@ def salvar_sprint(nova: dict):
         nova["BU"] = _normalizar_bu(nova["BU"])
     if "Semana" in nova and hasattr(nova["Semana"], 'strftime'):
         nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d 00:00:00")
-    df = _ler_sprints_raw()
+    df = carregar_sprints(use_cache=False)
     nova_completa = {col: nova.get(col, "") for col in COLUNAS_SPRINTS}
     df = pd.concat([df, pd.DataFrame([nova_completa])], ignore_index=True)
     _salvar_aba(ABA_SPRINTS, df)
@@ -306,7 +347,7 @@ def salvar_sprint(nova: dict):
 
 def atualizar_sprint(idx: int, dados: dict):
     """Atualiza campos de uma sprint existente pelo índice (no df carregado)."""
-    df = _ler_sprints_raw()
+    df = carregar_sprints(use_cache=False)
     if idx >= len(df):
         return
     for campo, valor in dados.items():
@@ -317,15 +358,16 @@ def atualizar_sprint(idx: int, dados: dict):
 
 # ── Chamados ──────────────────────────────────────────────────────────────────
 def _gerar_id_chamado(df: pd.DataFrame) -> str:
-    if df.empty or "ID" not in df.columns:
-        return "CHM-0001"
-    ids = df["ID"].astype(str).str.extract(r"(\d+)")[0].dropna().astype(int)
-    proximo = ids.max() + 1 if not ids.empty else 1
-    return f"CHM-{proximo:04d}"
+    while True:
+        novo_id = _gerar_id("CHM")
+        if df.empty or "ID" not in df.columns:
+            return novo_id
+        if not (df["ID"].astype(str) == novo_id).any():
+            return novo_id
 
-def carregar_chamados() -> pd.DataFrame:
+def carregar_chamados(use_cache: bool = True) -> pd.DataFrame:
     try:
-        df = _ler_aba(ABA_CHAMADOS)
+        df = _ler_aba(ABA_CHAMADOS, use_cache=use_cache)
         if df.empty:
             return pd.DataFrame(columns=COLUNAS_CHAMADOS)
         for col in COLUNAS_CHAMADOS:
@@ -340,7 +382,7 @@ def carregar_chamados() -> pd.DataFrame:
         return pd.DataFrame()
 
 def salvar_chamado(novo: dict):
-    df = carregar_chamados()
+    df = carregar_chamados(use_cache=False)
     if "ID" not in novo or not novo["ID"]:
         novo["ID"] = _gerar_id_chamado(df)
     novo_completo = {col: novo.get(col, "") for col in COLUNAS_CHAMADOS}
@@ -349,7 +391,7 @@ def salvar_chamado(novo: dict):
     _cache_invalidar(ABA_CHAMADOS)
 
 def atualizar_chamado(idx: int, dados: dict):
-    df = carregar_chamados()
+    df = carregar_chamados(use_cache=False)
     for campo, valor in dados.items():
         if campo in df.columns:
             df.at[idx, campo] = valor
@@ -357,7 +399,7 @@ def atualizar_chamado(idx: int, dados: dict):
     _cache_invalidar(ABA_CHAMADOS)
 
 def deletar_chamado(idx: int):
-    df = carregar_chamados()
+    df = carregar_chamados(use_cache=False)
     df = df.drop(index=idx).reset_index(drop=True)
     _salvar_aba(ABA_CHAMADOS, df)
     _cache_invalidar(ABA_CHAMADOS)

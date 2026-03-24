@@ -228,40 +228,39 @@ with tab_projetos:
     st.subheader("Projetos")
 
     # Session state para controle de edição/exclusão
-    if "proj_edit_idx" not in st.session_state:
-        st.session_state["proj_edit_idx"] = None
-    if "proj_del_idx" not in st.session_state:
-        st.session_state["proj_del_idx"] = None
+    if "proj_edit_id" not in st.session_state:
+        st.session_state["proj_edit_id"] = None
+    if "proj_del_id" not in st.session_state:
+        st.session_state["proj_del_id"] = None
 
     if df_filtrado.empty:
         st.info("Nenhum projeto encontrado.")
     else:
         PRIO_ICON = {"Alta":"🔴","Média":"🟡","Baixa":"🟢"}
-        df_filtrado_reset = df_filtrado.reset_index(drop=True)
-
-        for idx, row in df_filtrado_reset.iterrows():
+        for _, row in df_filtrado.iterrows():
+            proj_id = str(row.get("ID", ""))
             prio_icon = PRIO_ICON.get(str(row.get("Prioridade","Média")),"🟡")
             prog = int(row.get("Progresso (%)",0))
 
             with st.expander(f"{prio_icon} **{row['Projeto']}** — {row['Responsável']} | {row['Status']} | {prog}%", expanded=False):
 
                 # ── Modal de confirmação de exclusão ──────────────────────
-                if st.session_state["proj_del_idx"] == idx:
+                if st.session_state["proj_del_id"] == proj_id:
                     st.warning(f"⚠️ Tem certeza que deseja excluir o projeto **{row['Projeto']}**? Esta ação não pode ser desfeita.")
                     ca, cb, cc = st.columns([2,1,1])
-                    if cb.button("✅ Confirmar exclusão", key=f"conf_del_{idx}", type="primary"):
-                        deletar_projeto(idx)
-                        st.session_state["proj_del_idx"] = None
+                    if cb.button("✅ Confirmar exclusão", key=f"conf_del_{proj_id}", type="primary"):
+                        deletar_projeto(proj_id)
+                        st.session_state["proj_del_id"] = None
                         st.toast("Projeto excluído!", icon="🗑️")
                         st.rerun()
-                    if cc.button("❌ Cancelar", key=f"canc_del_{idx}"):
-                        st.session_state["proj_del_idx"] = None
+                    if cc.button("❌ Cancelar", key=f"canc_del_{proj_id}"):
+                        st.session_state["proj_del_id"] = None
                         st.rerun()
 
                 # ── Modal de edição ───────────────────────────────────────
-                elif st.session_state["proj_edit_idx"] == idx:
+                elif st.session_state["proj_edit_id"] == proj_id:
                     st.markdown("#### ✏️ Editando projeto")
-                    with st.form(f"form_edit_proj_{idx}"):
+                    with st.form(f"form_edit_proj_{proj_id}"):
                         ec1, ec2 = st.columns(2)
                         nome_e      = ec1.text_input("Nome do Projeto *", value=str(row.get("Projeto","")))
                         resp_e      = ec1.text_input("Responsável *",     value=str(row.get("Responsável","")))
@@ -278,18 +277,21 @@ with tab_projetos:
                         cancelar_e  = col_cc.form_submit_button("❌ Cancelar", use_container_width=True)
 
                         if salvar_e:
-                            atualizar_projeto(idx, {
+                            if prazo_e < inicio_e:
+                                st.error("O Prazo não pode ser anterior ao Início.")
+                            else:
+                                atualizar_projeto(proj_id, {
                                 "Projeto": nome_e, "Responsável": resp_e,
                                 "Prioridade": prio_e, "Status": status_e,
                                 "Início": pd.Timestamp(inicio_e).strftime("%Y-%m-%d"),
                                 "Prazo":  pd.Timestamp(prazo_e).strftime("%Y-%m-%d"),
                                 "Horas Gastas": horas_e, "Descrição": desc_e,
-                            })
-                            st.session_state["proj_edit_idx"] = None
-                            st.toast("Projeto atualizado!", icon="✅")
-                            st.rerun()
+                                })
+                                st.session_state["proj_edit_id"] = None
+                                st.toast("Projeto atualizado!", icon="✅")
+                                st.rerun()
                         if cancelar_e:
-                            st.session_state["proj_edit_idx"] = None
+                            st.session_state["proj_edit_id"] = None
                             st.rerun()
 
                 # ── Visualização normal ───────────────────────────────────
@@ -310,13 +312,13 @@ with tab_projetos:
 
                         # Botões editar / excluir
                         btn_col1, btn_col2 = st.columns(2)
-                        if btn_col1.button("✏️ Editar", key=f"edit_proj_{idx}", use_container_width=True):
-                            st.session_state["proj_edit_idx"] = idx
-                            st.session_state["proj_del_idx"]  = None
+                        if btn_col1.button("✏️ Editar", key=f"edit_proj_{proj_id}", use_container_width=True):
+                            st.session_state["proj_edit_id"] = proj_id
+                            st.session_state["proj_del_id"]  = None
                             st.rerun()
-                        if btn_col2.button("🗑️ Excluir", key=f"del_proj_{idx}", use_container_width=True):
-                            st.session_state["proj_del_idx"]  = idx
-                            st.session_state["proj_edit_idx"] = None
+                        if btn_col2.button("🗑️ Excluir", key=f"del_proj_{proj_id}", use_container_width=True):
+                            st.session_state["proj_del_id"]  = proj_id
+                            st.session_state["proj_edit_id"] = None
                             st.rerun()
 
                     with col_checks:
@@ -324,10 +326,10 @@ with tab_projetos:
                         etapas_atuais = get_etapas(row)
                         novas_etapas  = []
                         for i,etapa in enumerate(ETAPAS_PROJETO):
-                            checked = st.checkbox(etapa, value=etapas_atuais[i], key=f"etapa_{idx}_{i}")
+                            checked = st.checkbox(etapa, value=etapas_atuais[i], key=f"etapa_{proj_id}_{i}")
                             novas_etapas.append(checked)
                         if novas_etapas != etapas_atuais:
-                            atualizar_etapas(idx, novas_etapas)
+                            atualizar_etapas(proj_id, novas_etapas)
                             novo_prog = round((sum(novas_etapas)/len(ETAPAS_PROJETO))*100)
                             st.success(f"Progresso atualizado: {novo_prog}%")
                             st.rerun()
@@ -337,7 +339,7 @@ with tab_projetos:
         for c in ["Início","Prazo"]:
             if c in df_exp.columns:
                 df_exp[c] = df_exp[c].dt.strftime("%d/%m/%Y")
-        csv = df_exp.drop(columns=["Etapas"],errors="ignore").to_csv(index=False).encode("utf-8")
+        csv = df_exp.drop(columns=["ID", "Etapas"],errors="ignore").to_csv(index=False).encode("utf-8")
         st.download_button("⬇️ Exportar CSV", data=csv, file_name="projetos_ti.csv", mime="text/csv")
 
 # ══════════════════════════════════════════════════════════════════════════════
