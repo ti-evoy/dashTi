@@ -146,9 +146,9 @@ def carregar_dados() -> pd.DataFrame:
                     bits = val.split(",")
                 else:
                     bits = list(val.strip())
-                    feitas = sum(1 for b in bits if b.strip() == "1")
-                    total  = len(ETAPAS_PROJETO)
-                    return round((feitas / total) * 100)
+                feitas = sum(1 for b in bits if b.strip() == "1")
+                total  = len(ETAPAS_PROJETO)
+                return round((feitas / total) * 100)
             return row.get("Progresso (%)", 0)
 
 
