@@ -59,6 +59,7 @@ COLUNAS_CHAMADOS = [
 SITUACOES_CHAMADO = ["Aberto", "Em Andamento", "Atendido", "Cancelado", "Aguardando"]
 
 def _normalizar_bu(bu):
+    """Padroniza nomes de BU para os valores aceitos pela aplicação."""
     if pd.isna(bu): return bu
     bu_str = str(bu).strip()
     if bu_str in BUS_VALIDAS:
@@ -76,12 +77,15 @@ def _normalizar_bu(bu):
     return bu_str
 
 def calcular_progresso(etapas_concluidas):
+    """Calcula o percentual de progresso com base nas etapas concluídas."""
     return round((sum(etapas_concluidas) / len(ETAPAS_PROJETO)) * 100)
 
 def _gerar_id(prefixo: str) -> str:
+    """Gera um identificador curto e único para novos registros."""
     return f"{prefixo}-{uuid.uuid4().hex[:8].upper()}"
 
 def _garantir_colunas(df: pd.DataFrame, colunas: list[str]) -> pd.DataFrame:
+    """Garante que o DataFrame tenha todas as colunas esperadas na ordem correta."""
     df2 = df.copy()
     for col in colunas:
         if col not in df2.columns:
@@ -91,11 +95,13 @@ def _garantir_colunas(df: pd.DataFrame, colunas: list[str]) -> pd.DataFrame:
 # ── Conexão Google Sheets ─────────────────────────────────────────────────────
 @st.cache_resource
 def _get_client():
+    """Cria e reutiliza o cliente autenticado do Google Sheets."""
     creds_dict = dict(st.secrets["gcp_service_account"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return gspread.authorize(creds)
 
 def _get_sheet(aba: str):
+    """Obtém uma aba da planilha e cria a aba caso ela ainda não exista."""
     client = _get_client()
     sheet_id = st.secrets["SHEET_ID"]
     sh = client.open_by_key(sheet_id)
@@ -111,12 +117,15 @@ _CACHE_TTL_SEGUNDOS = 30
 _CACHE_POS_SAVE_TTL = 20
 
 def _cache_key(aba):
+    """Monta a chave de cache em sessão para os dados de uma aba."""
     return f"__aba_cache_{aba}"
 
 def _cache_ts_key(aba):
+    """Monta a chave de cache em sessão para o timestamp de uma aba."""
     return f"__aba_cache_ts_{aba}"
 
 def _cache_get(aba: str):
+    """Lê do cache em sessão quando os dados ainda estão dentro do TTL."""
     key    = _cache_key(aba)
     ts_key = _cache_ts_key(aba)
     if key in st.session_state and ts_key in st.session_state:
@@ -126,16 +135,19 @@ def _cache_get(aba: str):
     return None
 
 def _cache_set(aba: str, df: pd.DataFrame, ttl: int = _CACHE_TTL_SEGUNDOS):
+    """Armazena uma cópia do DataFrame em sessão para reutilização temporária."""
     st.session_state[_cache_key(aba)]    = df.copy()
     st.session_state[_cache_ts_key(aba)] = datetime.now()
 
 def _cache_invalidar(aba: str):
+    """Remove do cache em sessão os dados associados à aba informada."""
     if _cache_key(aba) in st.session_state:
         del st.session_state[_cache_key(aba)]
     if _cache_ts_key(aba) in st.session_state:
         del st.session_state[_cache_ts_key(aba)]
 
 def _ler_aba(aba: str, use_cache: bool = True) -> pd.DataFrame:
+    """Lê uma aba do Google Sheets, com suporte opcional a cache em sessão."""
     if use_cache:
         cached = _cache_get(aba)
         if cached is not None:
@@ -147,6 +159,7 @@ def _ler_aba(aba: str, use_cache: bool = True) -> pd.DataFrame:
     return df
 
 def _salvar_aba(aba: str, df: pd.DataFrame):
+    """Persiste o DataFrame inteiro na aba informada e atualiza o cache local."""
     ws  = _get_sheet(aba)
     df2 = df.copy()
     for col in df2.columns:
@@ -159,6 +172,7 @@ def _salvar_aba(aba: str, df: pd.DataFrame):
 
 # ── Projetos ──────────────────────────────────────────────────────────────────
 def carregar_dados(use_cache: bool = True) -> pd.DataFrame:
+    """Carrega os projetos, normaliza colunas e ajusta tipos usados pela interface."""
     try:
         df = _ler_aba(ABA_PROJETOS, use_cache=use_cache)
         if df.empty:
@@ -200,6 +214,7 @@ def carregar_dados(use_cache: bool = True) -> pd.DataFrame:
         return pd.DataFrame()
 
 def salvar_projeto(novo: dict):
+    """Adiciona um novo projeto à base, gerando ID quando necessário."""
     df = carregar_dados(use_cache=False)
     novo_formatado = novo.copy()
     if "ID" not in novo_formatado or not novo_formatado["ID"]:
@@ -231,6 +246,7 @@ def deletar_projeto(projeto_id: str):
     _salvar_aba(ABA_PROJETOS, df)
 
 def atualizar_etapas(projeto_id: str, etapas):
+    """Atualiza etapas, progresso e status final de um projeto específico."""
     df = carregar_dados(use_cache=False).reset_index(drop=True)
     mask = df["ID"].astype(str) == str(projeto_id)
     if not mask.any():
@@ -245,6 +261,7 @@ def atualizar_etapas(projeto_id: str, etapas):
     _salvar_aba(ABA_PROJETOS, df)
 
 def get_etapas(row):
+    """Converte a string salva de etapas em uma lista booleana para a UI."""
     val = str(row.get("Etapas",""))
     if val and val != "nan":
         if "," in val:
@@ -257,12 +274,14 @@ def get_etapas(row):
     return [False] * len(ETAPAS_PROJETO)
 
 def projetos_atrasados(df):
+    """Retorna apenas os projetos cujo prazo venceu e ainda não foram concluídos."""
     hoje = pd.Timestamp(datetime.today().date())
     mask = (df["Prazo"] < hoje) & (df["Status"] != "Concluído")
     return df[mask]
 
 # ── Reuniões ──────────────────────────────────────────────────────────────────
 def carregar_reunioes(use_cache: bool = True) -> pd.DataFrame:
+    """Carrega as reuniões agendadas e converte a data para datetime."""
     try:
         df = _ler_aba(ABA_REUNIOES, use_cache=use_cache)
         if df.empty:
@@ -276,6 +295,7 @@ def carregar_reunioes(use_cache: bool = True) -> pd.DataFrame:
         return pd.DataFrame()
 
 def salvar_reuniao(nova: dict):
+    """Adiciona uma nova reunião à base de dados."""
     df = carregar_reunioes(use_cache=False)
     nova_fmt = nova.copy()
     if "Data" in nova_fmt and hasattr(nova_fmt["Data"], 'strftime'):
@@ -286,21 +306,25 @@ def salvar_reuniao(nova: dict):
     _salvar_aba(ABA_REUNIOES, df)
 
 def deletar_reuniao(index: int):
+    """Remove uma reunião pelo índice atual da lista carregada."""
     df = carregar_reunioes(use_cache=False)
     df = df.drop(index=index).reset_index(drop=True)
     _salvar_aba(ABA_REUNIOES, df)
 
 # ── Sprints ───────────────────────────────────────────────────────────────────
 def segunda_da_semana():
+    """Retorna a data da segunda-feira da semana atual."""
     hoje = date.today()
     return hoje - timedelta(days=hoje.weekday())
 
 def proxima_segunda():
+    """Retorna a próxima segunda-feira a partir da data atual."""
     hoje = date.today()
     dias = (7 - hoje.weekday()) % 7
     return hoje + timedelta(days=dias if dias != 0 else 7)
 
 def _ler_sprints_raw() -> pd.DataFrame:
+    """Lê a aba de sprints preservando a estrutura bruta esperada."""
     ws   = _get_sheet(ABA_SPRINTS)
     data = ws.get_all_records(expected_headers=COLUNAS_SPRINTS)
     if not data:
@@ -315,6 +339,7 @@ def _ler_sprints_raw() -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 def carregar_sprints(use_cache: bool = True) -> pd.DataFrame:
+    """Carrega as sprints, padroniza colunas e normaliza a BU."""
     try:
         df = _ler_aba(ABA_SPRINTS, use_cache=use_cache)
         if df.empty:
@@ -335,6 +360,7 @@ def carregar_sprints(use_cache: bool = True) -> pd.DataFrame:
         return pd.DataFrame()
 
 def salvar_sprint(nova: dict):
+    """Adiciona uma nova sprint semanal à base."""
     if "BU" in nova:
         nova["BU"] = _normalizar_bu(nova["BU"])
     if "Semana" in nova and hasattr(nova["Semana"], 'strftime'):
@@ -358,6 +384,7 @@ def atualizar_sprint(idx: int, dados: dict):
 
 # ── Chamados ──────────────────────────────────────────────────────────────────
 def _gerar_id_chamado(df: pd.DataFrame) -> str:
+    """Gera um ID único para chamados evitando colisão com os já existentes."""
     while True:
         novo_id = _gerar_id("CHM")
         if df.empty or "ID" not in df.columns:
@@ -366,6 +393,7 @@ def _gerar_id_chamado(df: pd.DataFrame) -> str:
             return novo_id
 
 def carregar_chamados(use_cache: bool = True) -> pd.DataFrame:
+    """Carrega os chamados e garante a estrutura mínima esperada pela UI."""
     try:
         df = _ler_aba(ABA_CHAMADOS, use_cache=use_cache)
         if df.empty:
@@ -382,6 +410,7 @@ def carregar_chamados(use_cache: bool = True) -> pd.DataFrame:
         return pd.DataFrame()
 
 def salvar_chamado(novo: dict):
+    """Adiciona um novo chamado, criando ID quando ele não for informado."""
     df = carregar_chamados(use_cache=False)
     if "ID" not in novo or not novo["ID"]:
         novo["ID"] = _gerar_id_chamado(df)
@@ -391,6 +420,7 @@ def salvar_chamado(novo: dict):
     _cache_invalidar(ABA_CHAMADOS)
 
 def atualizar_chamado(idx: int, dados: dict):
+    """Atualiza um chamado pelo índice atual da lista carregada."""
     df = carregar_chamados(use_cache=False)
     for campo, valor in dados.items():
         if campo in df.columns:
@@ -399,6 +429,7 @@ def atualizar_chamado(idx: int, dados: dict):
     _cache_invalidar(ABA_CHAMADOS)
 
 def deletar_chamado(idx: int):
+    """Remove um chamado pelo índice atual da lista carregada."""
     df = carregar_chamados(use_cache=False)
     df = df.drop(index=idx).reset_index(drop=True)
     _salvar_aba(ABA_CHAMADOS, df)
