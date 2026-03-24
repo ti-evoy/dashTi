@@ -15,6 +15,7 @@ SCOPES = [
 ABA_PROJETOS  = "projetos"
 ABA_REUNIOES  = "reunioes"
 ABA_SPRINTS   = "sprints"
+ABA_CHAMADOS  = "chamados"
 
 ARQUIVO_LOCAL_PROJETOS  = "data/projetos.xlsx"
 ARQUIVO_LOCAL_REUNIOES  = "data/reunioes.xlsx"
@@ -38,6 +39,13 @@ COLUNAS_SPRINTS = [
     "Semana", "BU", "Responsável", "Progressos",
     "Desafios", "Próxima Sprint", "Meta", "Realizado"
 ]
+
+COLUNAS_CHAMADOS = [
+    "ID", "Tipo", "Chave", "Resumo", "Criado", "Solicitante",
+    "Fechado", "Situação", "Fornecedor", "Onde Impacta", "Obs"
+]
+
+SITUACOES_CHAMADO = ["Aberto", "Em Andamento", "Atendido", "Cancelado", "Aguardando"]
 
 def _normalizar_bu(bu):
     if pd.isna(bu): return bu
@@ -70,7 +78,12 @@ def _get_sheet(aba: str):
     client = _get_client()
     sheet_id = st.secrets["SHEET_ID"]
     sh = client.open_by_key(sheet_id)
-    return sh.worksheet(aba)
+    try:
+        return sh.worksheet(aba)
+    except gspread.exceptions.WorksheetNotFound:
+        # Cria a aba se não existir
+        ws = sh.add_worksheet(title=aba, rows=1000, cols=20)
+        return ws
 
 # ── Cache com session_state ───────────────────────────────────────────────────
 _CACHE_TTL_SEGUNDOS = 30
@@ -151,7 +164,6 @@ def carregar_dados() -> pd.DataFrame:
                 return round((feitas / total) * 100)
             return row.get("Progresso (%)", 0)
 
-
         df["Progresso (%)"] = df.apply(_recalc, axis=1)
         return df
     except Exception as e:
@@ -167,6 +179,20 @@ def salvar_projeto(novo: dict):
     df = pd.concat([df, pd.DataFrame([novo_formatado])], ignore_index=True)
     _salvar_aba(ABA_PROJETOS, df)
 
+def atualizar_projeto(idx: int, dados: dict):
+    """Atualiza campos de um projeto existente pelo índice."""
+    df = carregar_dados().reset_index(drop=True)
+    for campo, valor in dados.items():
+        if campo in df.columns:
+            df.at[idx, campo] = valor
+    _salvar_aba(ABA_PROJETOS, df)
+
+def deletar_projeto(idx: int):
+    """Remove um projeto pelo índice."""
+    df = carregar_dados().reset_index(drop=True)
+    df = df.drop(index=idx).reset_index(drop=True)
+    _salvar_aba(ABA_PROJETOS, df)
+
 def atualizar_etapas(idx, etapas):
     df = carregar_dados().reset_index(drop=True)
     etapas_str = ",".join(["1" if e else "0" for e in etapas])
@@ -180,7 +206,6 @@ def atualizar_etapas(idx, etapas):
 def get_etapas(row):
     val = str(row.get("Etapas",""))
     if val and val != "nan":
-        # Suporta "1,1,0,0" e "11000000"
         if "," in val:
             bits = val.split(",")
         else:
@@ -235,51 +260,34 @@ def proxima_segunda():
     return hoje + timedelta(days=dias if dias != 0 else 7)
 
 def _ler_sprints_raw() -> pd.DataFrame:
-    """
-    Lê a aba sprints direto do Sheets SEM cache e SEM filtrar linhas.
-    Garante todas as colunas existam. Usado pelo fluxo de salvamento.
-    """
     ws   = _get_sheet(ABA_SPRINTS)
     data = ws.get_all_records(expected_headers=COLUNAS_SPRINTS)
     if not data:
         return pd.DataFrame(columns=COLUNAS_SPRINTS)
     df = pd.DataFrame(data)
-    # Garante que todas as colunas existam
     for col in COLUNAS_SPRINTS:
         if col not in df.columns:
             df[col] = ""
-    df = df[COLUNAS_SPRINTS]  # ordena colunas corretamente
-    # Remove apenas linhas onde Semana E Responsável estão vazios (lixo real)
+    df = df[COLUNAS_SPRINTS]
     df = df[~((df["Semana"].astype(str).str.strip() == "") &
               (df["Responsável"].astype(str).str.strip() == ""))]
     return df.reset_index(drop=True)
 
 def carregar_sprints() -> pd.DataFrame:
-    """
-    Lê e prepara sprints para EXIBIÇÃO via cache.
-    Normaliza BU e datas sem descartar linhas válidas.
-    """
     try:
         df = _ler_aba(ABA_SPRINTS)
         if df.empty:
             return pd.DataFrame(columns=COLUNAS_SPRINTS)
-
-        # Garante todas as colunas
         for col in COLUNAS_SPRINTS:
             if col not in df.columns:
                 df[col] = ""
-
-        # Remove linhas onde Semana E Responsável estão vazios
         df = df[~((df["Semana"].astype(str).str.strip() == "") &
                   (df["Responsável"].astype(str).str.strip() == ""))]
-
         if "Semana" in df.columns:
             df["Semana"] = pd.to_datetime(df["Semana"], errors="coerce")
             df = df.dropna(subset=["Semana"])
-
         if "BU" in df.columns:
             df["BU"] = df["BU"].apply(_normalizar_bu)
-
         return df.reset_index(drop=True)
     except Exception as e:
         st.error(f"Erro ao carregar sprints: {e}")
@@ -289,11 +297,67 @@ def salvar_sprint(nova: dict):
     if "BU" in nova:
         nova["BU"] = _normalizar_bu(nova["BU"])
     if "Semana" in nova and hasattr(nova["Semana"], 'strftime'):
-        # ✅ Força o formato com horário para o Sheets reconhecer corretamente
         nova["Semana"] = nova["Semana"].strftime("%Y-%m-%d 00:00:00")
-
     df = _ler_sprints_raw()
     nova_completa = {col: nova.get(col, "") for col in COLUNAS_SPRINTS}
     df = pd.concat([df, pd.DataFrame([nova_completa])], ignore_index=True)
     _salvar_aba(ABA_SPRINTS, df)
     _cache_invalidar(ABA_SPRINTS)
+
+def atualizar_sprint(idx: int, dados: dict):
+    """Atualiza campos de uma sprint existente pelo índice (no df carregado)."""
+    df = _ler_sprints_raw()
+    if idx >= len(df):
+        return
+    for campo, valor in dados.items():
+        if campo in df.columns:
+            df.at[idx, campo] = valor
+    _salvar_aba(ABA_SPRINTS, df)
+    _cache_invalidar(ABA_SPRINTS)
+
+# ── Chamados ──────────────────────────────────────────────────────────────────
+def _gerar_id_chamado(df: pd.DataFrame) -> str:
+    if df.empty or "ID" not in df.columns:
+        return "CHM-0001"
+    ids = df["ID"].astype(str).str.extract(r"(\d+)")[0].dropna().astype(int)
+    proximo = ids.max() + 1 if not ids.empty else 1
+    return f"CHM-{proximo:04d}"
+
+def carregar_chamados() -> pd.DataFrame:
+    try:
+        df = _ler_aba(ABA_CHAMADOS)
+        if df.empty:
+            return pd.DataFrame(columns=COLUNAS_CHAMADOS)
+        for col in COLUNAS_CHAMADOS:
+            if col not in df.columns:
+                df[col] = ""
+        for col in ["Criado", "Fechado"]:
+            if col in df.columns:
+                df[col] = df[col].astype(str)
+        return df.reset_index(drop=True)
+    except Exception as e:
+        st.error(f"Erro ao carregar chamados: {e}")
+        return pd.DataFrame()
+
+def salvar_chamado(novo: dict):
+    df = carregar_chamados()
+    if "ID" not in novo or not novo["ID"]:
+        novo["ID"] = _gerar_id_chamado(df)
+    novo_completo = {col: novo.get(col, "") for col in COLUNAS_CHAMADOS}
+    df = pd.concat([df, pd.DataFrame([novo_completo])], ignore_index=True)
+    _salvar_aba(ABA_CHAMADOS, df)
+    _cache_invalidar(ABA_CHAMADOS)
+
+def atualizar_chamado(idx: int, dados: dict):
+    df = carregar_chamados()
+    for campo, valor in dados.items():
+        if campo in df.columns:
+            df.at[idx, campo] = valor
+    _salvar_aba(ABA_CHAMADOS, df)
+    _cache_invalidar(ABA_CHAMADOS)
+
+def deletar_chamado(idx: int):
+    df = carregar_chamados()
+    df = df.drop(index=idx).reset_index(drop=True)
+    _salvar_aba(ABA_CHAMADOS, df)
+    _cache_invalidar(ABA_CHAMADOS)
