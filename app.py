@@ -1301,37 +1301,26 @@ with tab_noticia:
             noticias = []
 
         with coluna:
-            html_card = [f'<div class="news-card"><div class="news-source">{fonte["nome"]}</div>']
-            if noticias:
-                for noticia in noticias:
-                    resumo = _texto_seguro_html(
-                        noticia["resumo"] if noticia["resumo"] else "Clique para abrir a matéria completa."
-                    )
-                    meta = _texto_seguro_html(noticia["data"] if noticia["data"] else "Atualização recente")
-                    titulo = _texto_seguro_html(noticia["titulo"])
-                    link = _texto_seguro_html(noticia["link"])
-                    html_card.append(
+            with st.container(border=True):
+                st.markdown(f'<div class="news-source">{fonte["nome"]}</div>', unsafe_allow_html=True)
+                if noticias:
+                    for idx, noticia in enumerate(noticias):
+                        st.markdown(f"[{noticia['titulo']}]({noticia['link']})")
+                        st.caption(noticia["data"] if noticia["data"] else "Atualização recente")
+                        st.write(noticia["resumo"] if noticia["resumo"] else "Clique para abrir a matéria completa.")
+                        if idx < len(noticias) - 1:
+                            st.divider()
+                else:
+                    st.markdown(
                         f"""
-                        <div class="news-item">
-                            <a href="{link}" target="_blank">{titulo}</a>
-                            <div class="news-meta">{meta}</div>
-                            <p class="news-summary">{resumo}</p>
+                        <div class="source-fallback">
+                            <h4>{fonte['nome']}</h4>
+                            <p>O feed não respondeu neste momento. Acesse o portal oficial para acompanhar a cobertura completa.</p>
                         </div>
-                        """
+                        """,
+                        unsafe_allow_html=True,
                     )
-            else:
-                html_card.append(
-                    f"""
-                    <div class="source-fallback">
-                        <h4>{fonte['nome']}</h4>
-                        <p>O feed não respondeu neste momento. Acesse o portal oficial para acompanhar a cobertura completa.</p>
-                    </div>
-                    """
-                )
-            html_card.append(
-                f'<div class="news-item"><a href="{_texto_seguro_html(fonte["site"])}" target="_blank">Abrir portal</a></div></div>'
-            )
-            st.markdown("".join(html_card), unsafe_allow_html=True)
+                st.link_button("Abrir portal", fonte["site"], use_container_width=True)
 
     st.divider()
     st.markdown("#### Mercado financeiro com base no Banco Central")
