@@ -2,7 +2,12 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from html import unescape
+import json
+import re
+import urllib.request
+import xml.etree.ElementTree as ET
 from utils import (
     carregar_dados, salvar_projeto, projetos_atrasados,
     atualizar_etapas, get_etapas, ETAPAS_PROJETO,
@@ -13,6 +18,168 @@ from utils import (
     SITUACOES_CHAMADO,
 )
 
+
+def _limpar_html(texto):
+    if not texto:
+        return ""
+    texto = re.sub(r"<[^>]+>", " ", str(texto))
+    texto = re.sub(r"\s+", " ", unescape(texto)).strip()
+    return texto
+
+
+def _formatar_data_feed(valor):
+    if not valor:
+        return ""
+    bruto = str(valor).strip()
+    formatos = [
+        "%a, %d %b %Y %H:%M:%S %z",
+        "%a, %d %b %Y %H:%M:%S %Z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%d %H:%M:%S",
+    ]
+    for formato in formatos:
+        try:
+            dt = datetime.strptime(bruto, formato)
+            return dt.strftime("%d/%m/%Y")
+        except ValueError:
+            continue
+    return bruto[:10] if len(bruto) >= 10 else bruto
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def carregar_feed_rss(url: str, limite: int = 4) -> list[dict]:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36"
+            )
+        },
+    )
+    with urllib.request.urlopen(req, timeout=20) as resposta:
+        xml_bytes = resposta.read()
+
+    raiz = ET.fromstring(xml_bytes)
+    itens = []
+    candidatos = raiz.findall(".//channel/item")
+    if not candidatos and raiz.tag.endswith("feed"):
+        candidatos = raiz.findall(".//{http://www.w3.org/2005/Atom}entry")
+
+    for item in candidatos[:limite]:
+        if item.tag.endswith("entry"):
+            titulo = item.findtext("{http://www.w3.org/2005/Atom}title", default="")
+            link_node = item.find("{http://www.w3.org/2005/Atom}link")
+            link = link_node.attrib.get("href", "") if link_node is not None else ""
+            data_pub = item.findtext("{http://www.w3.org/2005/Atom}updated", default="")
+            resumo = item.findtext("{http://www.w3.org/2005/Atom}summary", default="")
+        else:
+            titulo = item.findtext("title", default="")
+            link = item.findtext("link", default="")
+            data_pub = item.findtext("pubDate", default="")
+            resumo = (
+                item.findtext("description", default="")
+                or item.findtext("{http://purl.org/rss/1.0/modules/content/}encoded", default="")
+            )
+        itens.append(
+            {
+                "titulo": _limpar_html(titulo),
+                "link": link.strip(),
+                "data": _formatar_data_feed(data_pub),
+                "resumo": _limpar_html(resumo)[:220],
+            }
+        )
+    return [item for item in itens if item["titulo"] and item["link"]]
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def carregar_indicadores_bcb():
+    fim = date.today()
+    inicio = fim - timedelta(days=7)
+    periodo_inicial = inicio.strftime("%m-%d-%Y")
+    periodo_final = fim.strftime("%m-%d-%Y")
+    indicadores = [
+        {
+            "nome": "Meta Selic",
+            "tipo": "sgs",
+            "url": "https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json",
+            "sufixo": "%",
+            "descricao": "Última meta definida pelo Banco Central.",
+        },
+        {
+            "nome": "Selic diária",
+            "tipo": "sgs",
+            "url": "https://api.bcb.gov.br/dados/serie/bcdata.sgs.11/dados/ultimos/1?formato=json",
+            "sufixo": "%",
+            "descricao": "Taxa diária publicada na série SGS.",
+            "multiplicador": 100,
+        },
+        {
+            "nome": "Dólar PTAX venda",
+            "tipo": "ptax",
+            "url": (
+                "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+                "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+                f"?@moeda='USD'&@dataInicial='{periodo_inicial}'&@dataFinalCotacao='{periodo_final}'"
+                "&$top=1&$orderby=dataHoraCotacao%20desc&$format=json"
+            ),
+            "prefixo": "R$ ",
+            "descricao": "Cotação oficial PTAX de venda.",
+        },
+        {
+            "nome": "Euro PTAX venda",
+            "tipo": "ptax",
+            "url": (
+                "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+                "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+                f"?@moeda='EUR'&@dataInicial='{periodo_inicial}'&@dataFinalCotacao='{periodo_final}'"
+                "&$top=1&$orderby=dataHoraCotacao%20desc&$format=json"
+            ),
+            "prefixo": "R$ ",
+            "descricao": "Cotação oficial PTAX de venda.",
+        },
+    ]
+
+    resultados = []
+    for indicador in indicadores:
+        try:
+            req = urllib.request.Request(indicador["url"], headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=20) as resposta:
+                payload = json.loads(resposta.read().decode("utf-8"))
+
+            if indicador["tipo"] == "ptax":
+                ultimo = payload["value"][0]
+                valor = float(ultimo["cotacaoVenda"])
+                data_ref = str(ultimo["dataHoraCotacao"]).split(" ")[0]
+            else:
+                ultimo = payload[0]
+                valor = float(str(ultimo["valor"]).replace(",", "."))
+                valor *= indicador.get("multiplicador", 1)
+                data_ref = ultimo["data"]
+
+            prefixo = indicador.get("prefixo", "")
+            sufixo = indicador.get("sufixo", "")
+            texto_valor = f"{prefixo}{valor:,.2f}{sufixo}".replace(",", "X").replace(".", ",").replace("X", ".")
+            resultados.append(
+                {
+                    "nome": indicador["nome"],
+                    "valor": texto_valor,
+                    "data": _formatar_data_feed(data_ref),
+                    "descricao": indicador["descricao"],
+                }
+            )
+        except Exception:
+            resultados.append(
+                {
+                    "nome": indicador["nome"],
+                    "valor": "Indisponível",
+                    "data": "",
+                    "descricao": indicador["descricao"],
+                }
+            )
+    return resultados
+
 # ── Página ────────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Dashboard TI", page_icon="", layout="wide")
 
@@ -21,7 +188,7 @@ st.set_page_config(page_title="Dashboard TI", page_icon="", layout="wide")
 _token_valido = st.secrets.get("TOKEN_ACESSO", "")
 _token_url = st.query_params.get("token", "")
 if _token_valido and _token_url != _token_valido:
-    st.error("🔒 Acesso não autorizado. Verifique o link com sua equipe.")
+    st.error("Acesso não autorizado. Verifique o link com sua equipe.")
     st.stop()
 
 
@@ -100,6 +267,118 @@ st.markdown("""
     .badge-andamento { background:#713f12; color:#fde68a; padding:2px 10px; border-radius:99px; font-size:11px; font-weight:700; }
     .badge-cancelado { background:#3f1515; color:#fca5a5; padding:2px 10px; border-radius:99px; font-size:11px; font-weight:700; }
     .badge-aguardando{ background:#312e81; color:#c7d2fe; padding:2px 10px; border-radius:99px; font-size:11px; font-weight:700; }
+    .news-hero {
+        background: linear-gradient(135deg, #0f172a 0%, #16243f 55%, #0d2212 100%);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 18px;
+        padding: 1.4rem 1.5rem;
+        margin-bottom: 1rem;
+    }
+    .news-kicker {
+        color: #00d339;
+        font-size: 0.78rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 0.45rem;
+        font-weight: 700;
+    }
+    .news-title {
+        color: #e2e8f0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        line-height: 1.25;
+    }
+    .news-subtitle {
+        color: #94a3b8;
+        font-size: 0.95rem;
+        line-height: 1.55;
+        margin: 0;
+    }
+    .news-card {
+        background: #111c31;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 16px;
+        padding: 1rem 1.05rem;
+        min-height: 290px;
+        margin-bottom: 1rem;
+    }
+    .news-card h4 {
+        margin: 0 0 0.35rem 0;
+        color: #f8fafc;
+        font-size: 1rem;
+    }
+    .news-source {
+        color: #00d339;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 0.7rem;
+    }
+    .news-item {
+        padding: 0.75rem 0;
+        border-top: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .news-item:first-of-type { border-top: 0; padding-top: 0; }
+    .news-item a {
+        color: #e2e8f0;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .news-item a:hover { color: #00d339; }
+    .news-meta {
+        color: #64748b;
+        font-size: 0.78rem;
+        margin: 0.3rem 0;
+    }
+    .news-summary {
+        color: #94a3b8;
+        font-size: 0.84rem;
+        line-height: 1.45;
+        margin: 0;
+    }
+    .market-card {
+        background: #101826;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        border-radius: 16px;
+        padding: 1rem 1.1rem;
+        margin-bottom: 0.9rem;
+    }
+    .market-card h4 {
+        margin: 0;
+        color: #e2e8f0;
+        font-size: 0.92rem;
+        font-weight: 600;
+    }
+    .market-value {
+        color: #00d339;
+        font-size: 1.4rem;
+        font-weight: 700;
+        margin: 0.35rem 0 0.2rem 0;
+    }
+    .market-meta {
+        color: #64748b;
+        font-size: 0.8rem;
+        margin: 0;
+    }
+    .source-fallback {
+        background: #121a28;
+        border: 1px dashed rgba(148, 163, 184, 0.2);
+        border-radius: 16px;
+        padding: 1rem 1.1rem;
+        margin-top: 0.5rem;
+    }
+    .source-fallback h4 {
+        margin: 0 0 0.35rem 0;
+        color: #e2e8f0;
+    }
+    .source-fallback p {
+        color: #94a3b8;
+        margin: 0;
+        font-size: 0.86rem;
+        line-height: 1.45;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -113,6 +392,47 @@ CORES_STATUS = {
     "Pausado":      "#f59e0b",
 }
 PRIO_ORDEM = {"Alta": 0, "Média": 1, "Baixa": 2}
+
+FONTES_TECNOLOGIA = [
+    {
+        "nome": "MIT News",
+        "url": "https://news.mit.edu/rss/topic/technology",
+        "site": "https://news.mit.edu/topic/technology",
+    },
+    {
+        "nome": "Harvard Gazette",
+        "url": "https://news.harvard.edu/gazette/feed/",
+        "site": "https://news.harvard.edu/gazette/",
+    },
+    {
+        "nome": "CIO.com",
+        "url": "https://www.cio.com/feed/",
+        "site": "https://www.cio.com/",
+    },
+    {
+        "nome": "IT Forum",
+        "url": "https://itforum.com.br/feed/",
+        "site": "https://itforum.com.br/",
+    },
+]
+
+FONTES_INSTITUCIONAIS = [
+    {
+        "nome": "Gartner",
+        "site": "https://www.gartner.com/en/newsroom",
+        "descricao": "Portal institucional para acompanhar análises e anúncios quando o feed não estiver acessível.",
+    },
+    {
+        "nome": "Banco Central do Brasil",
+        "site": "https://www.bcb.gov.br/acessoinformacao/noticias",
+        "descricao": "Área oficial de notícias, comunicados e publicações para o bloco de mercado financeiro.",
+    },
+    {
+        "nome": "IT Insider",
+        "site": "https://www.google.com/search?q=IT+Insider+tecnologia",
+        "descricao": "Fonte mantida como referência editorial, mesmo sem feed estável disponível neste ambiente.",
+    },
+]
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -149,8 +469,8 @@ if "Progresso (%)" in df_filtrado.columns:
     df_filtrado = df_filtrado[df_filtrado["Progresso (%)"].between(progresso_range[0], progresso_range[1])]
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_dash, tab_projetos, tab_novo, tab_cal, tab_sprint, tab_chamados, tab_ia = st.tabs([
-    "Dashboard", "Projetos", "Novo Projeto", "Calendário", "Sprint", "Chamados", "IA do TI"
+tab_dash, tab_projetos, tab_novo, tab_cal, tab_sprint, tab_chamados, tab_noticia, tab_ia = st.tabs([
+    "Dashboard", "Projetos", "Novo Projeto", "Calendário", "Sprint", "Chamados", "Notícia", "IA do TI"
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -236,30 +556,28 @@ with tab_projetos:
     if df_filtrado.empty:
         st.info("Nenhum projeto encontrado.")
     else:
-        PRIO_ICON = {"Alta":"🔴","Média":"🟡","Baixa":"🟢"}
         for _, row in df_filtrado.iterrows():
             proj_id = str(row.get("ID", ""))
-            prio_icon = PRIO_ICON.get(str(row.get("Prioridade","Média")),"🟡")
             prog = int(row.get("Progresso (%)",0))
 
-            with st.expander(f"{prio_icon} **{row['Projeto']}** — {row['Responsável']} | {row['Status']} | {prog}%", expanded=False):
+            with st.expander(f"**{row['Projeto']}** — {row['Responsável']} | {row['Status']} | {prog}%", expanded=False):
 
                 # ── Modal de confirmação de exclusão ──────────────────────
                 if st.session_state["proj_del_id"] == proj_id:
-                    st.warning(f"⚠️ Tem certeza que deseja excluir o projeto **{row['Projeto']}**? Esta ação não pode ser desfeita.")
+                    st.warning(f"Tem certeza que deseja excluir o projeto **{row['Projeto']}**? Esta ação não pode ser desfeita.")
                     ca, cb, cc = st.columns([2,1,1])
-                    if cb.button("✅ Confirmar exclusão", key=f"conf_del_{proj_id}", type="primary"):
+                    if cb.button("Confirmar exclusão", key=f"conf_del_{proj_id}", type="primary"):
                         deletar_projeto(proj_id)
                         st.session_state["proj_del_id"] = None
-                        st.toast("Projeto excluído!", icon="🗑️")
+                        st.toast("Projeto excluído!")
                         st.rerun()
-                    if cc.button("❌ Cancelar", key=f"canc_del_{proj_id}"):
+                    if cc.button("Cancelar", key=f"canc_del_{proj_id}"):
                         st.session_state["proj_del_id"] = None
                         st.rerun()
 
                 # ── Modal de edição ───────────────────────────────────────
                 elif st.session_state["proj_edit_id"] == proj_id:
-                    st.markdown("#### ✏️ Editando projeto")
+                    st.markdown("#### Editando projeto")
                     with st.form(f"form_edit_proj_{proj_id}"):
                         ec1, ec2 = st.columns(2)
                         nome_e      = ec1.text_input("Nome do Projeto *", value=str(row.get("Projeto","")))
@@ -273,8 +591,8 @@ with tab_projetos:
                         horas_e     = ec2.number_input("Horas Gastas", min_value=0, value=int(row.get("Horas Gastas",0)), step=1)
                         desc_e      = st.text_area("Descrição", value=str(row.get("Descrição","")) if str(row.get("Descrição","")) != "nan" else "")
                         col_sv, col_cc = st.columns(2)
-                        salvar_e    = col_sv.form_submit_button("💾 Salvar alterações", type="primary", use_container_width=True)
-                        cancelar_e  = col_cc.form_submit_button("❌ Cancelar", use_container_width=True)
+                        salvar_e    = col_sv.form_submit_button("Salvar alterações", type="primary", use_container_width=True)
+                        cancelar_e  = col_cc.form_submit_button("Cancelar", use_container_width=True)
 
                         if salvar_e:
                             if prazo_e < inicio_e:
@@ -288,7 +606,7 @@ with tab_projetos:
                                 "Horas Gastas": horas_e, "Descrição": desc_e,
                                 })
                                 st.session_state["proj_edit_id"] = None
-                                st.toast("Projeto atualizado!", icon="✅")
+                                st.toast("Projeto atualizado!")
                                 st.rerun()
                         if cancelar_e:
                             st.session_state["proj_edit_id"] = None
@@ -312,17 +630,17 @@ with tab_projetos:
 
                         # Botões editar / excluir
                         btn_col1, btn_col2 = st.columns(2)
-                        if btn_col1.button("✏️ Editar", key=f"edit_proj_{proj_id}", use_container_width=True):
+                        if btn_col1.button("Editar", key=f"edit_proj_{proj_id}", use_container_width=True):
                             st.session_state["proj_edit_id"] = proj_id
                             st.session_state["proj_del_id"]  = None
                             st.rerun()
-                        if btn_col2.button("🗑️ Excluir", key=f"del_proj_{proj_id}", use_container_width=True):
+                        if btn_col2.button("Excluir", key=f"del_proj_{proj_id}", use_container_width=True):
                             st.session_state["proj_del_id"]  = proj_id
                             st.session_state["proj_edit_id"] = None
                             st.rerun()
 
                     with col_checks:
-                        st.markdown("**⚙️ Etapas do Projeto**")
+                        st.markdown("**Etapas do Projeto**")
                         etapas_atuais = get_etapas(row)
                         novas_etapas  = []
                         for i,etapa in enumerate(ETAPAS_PROJETO):
@@ -359,14 +677,14 @@ with tab_novo:
             prazo     = st.date_input("Prazo *",          value=date.today())
             horas     = st.number_input("Horas Gastas", min_value=0, value=0, step=1)
             descricao = st.text_area("Descrição", placeholder="Breve descrição...")
-        st.markdown("**⚙️ Etapas iniciais concluídas** *(opcional — você pode marcar depois na aba Projetos)*")
+        st.markdown("**Etapas iniciais concluídas** *(opcional — você pode marcar depois na aba Projetos)*")
         cols_etapas = st.columns(2)
         etapas_ini = []
         for i,etapa in enumerate(ETAPAS_PROJETO):
             etapas_ini.append(cols_etapas[i%2].checkbox(etapa, value=False, key=f"novo_etapa_{i}"))
         prog_ini = round((sum(etapas_ini)/len(ETAPAS_PROJETO))*100)
         st.info(f"Progresso calculado automaticamente: **{prog_ini}%**")
-        enviado = st.form_submit_button("✅ Cadastrar Projeto", use_container_width=True, type="primary")
+        enviado = st.form_submit_button("Cadastrar Projeto", use_container_width=True, type="primary")
         if enviado:
             if not nome or not responsavel:
                 st.error("Preencha pelo menos Nome e Responsável.")
@@ -380,7 +698,7 @@ with tab_novo:
                     "Início":pd.Timestamp(inicio), "Prazo":pd.Timestamp(prazo),
                     "Horas Gastas":horas, "Descrição":descricao,
                 })
-                st.success(f"✅ Projeto **{nome}** cadastrado! Progresso inicial: {prog_ini}%")
+                st.success(f"Projeto **{nome}** cadastrado. Progresso inicial: {prog_ini}%")
                 st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -393,7 +711,7 @@ with tab_cal:
 
     reunioes = carregar_reunioes()
 
-    sub_cal, sub_gerenciar = st.tabs(["Calendário", "⚙️ Gerenciar Reuniões"])
+    sub_cal, sub_gerenciar = st.tabs(["Calendário", "Gerenciar Reuniões"])
 
     with sub_cal:
         with st.form("form_reuniao", clear_on_submit=True):
@@ -409,7 +727,7 @@ with tab_cal:
             hora_m  = c7.selectbox("Minuto *", [0,15,30,45],               format_func=lambda x:f"{x:02d}")
             local   = c8.text_input("Local / Link", placeholder="Sala 3 ou Meet")
             obs_r   = c9.text_input("Obs.", placeholder="Pauta...")
-            if st.form_submit_button("✅ Salvar Reunião", use_container_width=True, type="primary"):
+            if st.form_submit_button("Salvar Reunião", use_container_width=True, type="primary"):
                 if not titulo_r or not responsavel_r or not participantes or not empresa:
                     st.error("Preencha os campos obrigatórios *.")
                 else:
@@ -557,13 +875,13 @@ render();
                             obs = str(row.get("Observações",""))
                             extra = []
                             if loc and loc not in ("nan",""): extra.append(f"📍 {loc}")
-                            if obs and obs not in ("nan",""): extra.append(f"📝 {obs}")
+                            if obs and obs not in ("nan",""): extra.append(f"Obs.: {obs}")
                             if extra:
                                 st.caption(" · ".join(extra))
                         with col_btn:
-                            if st.button("🗑️", key=f"del_{pos}", help="Excluir reunião"):
+                            if st.button("Excluir", key=f"del_{pos}", help="Excluir reunião"):
                                 deletar_reuniao(pos)
-                                st.toast("Reunião excluída!", icon="🗑️")
+                                st.toast("Reunião excluída!")
                                 st.rerun()
                         st.divider()
 
@@ -638,7 +956,7 @@ with tab_sprint:
             )
             realizado = st.text_input(
                 "Realizado vs Meta",
-                placeholder="Ex: 98,7% ✅"
+                placeholder="Ex: 98,7%"
             )
             ok_sp = st.form_submit_button("Salvar Sprint", use_container_width=True, type="primary")
 
@@ -668,7 +986,7 @@ with tab_sprint:
                             "Meta":         meta,
                             "Realizado":    realizado,
                         })
-                        st.success(f"✅ Sprint de **{responsavel_sp}** ({bu}) salva!")
+                        st.success(f"Sprint de **{responsavel_sp}** ({bu}) salva.")
                         st.rerun()
 
     with col_hist:
@@ -703,13 +1021,13 @@ with tab_sprint:
                     is_atual   = (not pd.isnull(semana_ts)) and semana_ts.date() == seg_atual
 
                     with st.expander(
-                        f"{'🟢 ' if is_atual else ''}Semana {semana_str} — {sp.get('BU','')} — {sp.get('Responsável','')}",
+                        f"{'Atual ' if is_atual else ''}Semana {semana_str} — {sp.get('BU','')} — {sp.get('Responsável','')}",
                         expanded=is_atual
                     ):
                         # ── Botão Editar Sprint ──────────────────────────
                         edit_key = f"sprint_edit_{raw_idx}"
                         if st.session_state["sprint_edit_idx"] == raw_idx:
-                            st.markdown("#### ✏️ Editando Sprint")
+                            st.markdown("#### Editando Sprint")
                             with st.form(f"form_edit_sprint_{raw_idx}"):
                                 ep1, ep2 = st.columns(2)
                                 meta_e     = ep1.text_input("Meta",      value=str(sp.get("Meta","")) if str(sp.get("Meta","")) != "nan" else "")
@@ -718,8 +1036,8 @@ with tab_sprint:
                                 desaf_e    = st.text_area("Desafios",      value=str(sp.get("Desafios",""))      if str(sp.get("Desafios","")) != "nan" else "",      height=80)
                                 proxima_e  = st.text_area("Próxima Sprint",value=str(sp.get("Próxima Sprint","")) if str(sp.get("Próxima Sprint","")) != "nan" else "",height=80)
                                 es1, es2   = st.columns(2)
-                                salvar_sp  = es1.form_submit_button("💾 Salvar", type="primary", use_container_width=True)
-                                cancelar_sp= es2.form_submit_button("❌ Cancelar", use_container_width=True)
+                                salvar_sp  = es1.form_submit_button("Salvar", type="primary", use_container_width=True)
+                                cancelar_sp= es2.form_submit_button("Cancelar", use_container_width=True)
                                 if salvar_sp:
                                     atualizar_sprint(raw_idx, {
                                         "Meta": meta_e, "Realizado": realiz_e,
@@ -727,13 +1045,13 @@ with tab_sprint:
                                         "Próxima Sprint": proxima_e,
                                     })
                                     st.session_state["sprint_edit_idx"] = None
-                                    st.toast("Sprint atualizada!", icon="✅")
+                                    st.toast("Sprint atualizada!")
                                     st.rerun()
                                 if cancelar_sp:
                                     st.session_state["sprint_edit_idx"] = None
                                     st.rerun()
                         else:
-                            if st.button("✏️ Editar esta Sprint", key=edit_key):
+                            if st.button("Editar esta Sprint", key=edit_key):
                                 st.session_state["sprint_edit_idx"] = raw_idx
                                 st.rerun()
 
@@ -769,7 +1087,7 @@ with tab_chamados:
 
     df_cham = carregar_chamados()
 
-    sub_lista, sub_novo_cham = st.tabs(["📋 Lista de Chamados", "➕ Novo Chamado"])
+    sub_lista, sub_novo_cham = st.tabs(["Lista de Chamados", "Novo Chamado"])
 
     # ══ SUB-TAB: LISTA ════════════════════════════════════════════════════════
     with sub_lista:
@@ -815,20 +1133,20 @@ with tab_chamados:
                 ):
                     # ── Confirmação exclusão ─────────────────────────────
                     if st.session_state["cham_del_idx"] == raw_idx:
-                        st.warning(f"⚠️ Excluir chamado **{row.get('Chave','—')}**? Ação irreversível.")
+                        st.warning(f"Excluir chamado **{row.get('Chave','—')}**? Ação irreversível.")
                         cd1, cd2 = st.columns(2)
-                        if cd1.button("✅ Confirmar", key=f"conf_del_cham_{raw_idx}", type="primary"):
+                        if cd1.button("Confirmar", key=f"conf_del_cham_{raw_idx}", type="primary"):
                             deletar_chamado(raw_idx)
                             st.session_state["cham_del_idx"] = None
-                            st.toast("Chamado excluído!", icon="🗑️")
+                            st.toast("Chamado excluído!")
                             st.rerun()
-                        if cd2.button("❌ Cancelar", key=f"canc_del_cham_{raw_idx}"):
+                        if cd2.button("Cancelar", key=f"canc_del_cham_{raw_idx}"):
                             st.session_state["cham_del_idx"] = None
                             st.rerun()
 
                     # ── Formulário de edição ──────────────────────────────
                     elif st.session_state["cham_edit_idx"] == raw_idx:
-                        st.markdown("#### ✏️ Editando Chamado")
+                        st.markdown("#### Editando Chamado")
                         with st.form(f"form_edit_cham_{raw_idx}"):
                             ce1, ce2 = st.columns(2)
                             tipo_e   = ce1.text_input("Tipo",        value=str(row.get("Tipo","")))
@@ -844,8 +1162,8 @@ with tab_chamados:
                             impacta_e= st.text_input("Onde Impacta", value=str(row.get("Onde Impacta","")) if str(row.get("Onde Impacta","")) != "nan" else "")
                             obs_e    = st.text_area("Obs", value=str(row.get("Obs","")) if str(row.get("Obs","")) != "nan" else "", height=100)
                             sv1, sv2 = st.columns(2)
-                            salvar_ce   = sv1.form_submit_button("💾 Salvar", type="primary", use_container_width=True)
-                            cancelar_ce = sv2.form_submit_button("❌ Cancelar", use_container_width=True)
+                            salvar_ce   = sv1.form_submit_button("Salvar", type="primary", use_container_width=True)
+                            cancelar_ce = sv2.form_submit_button("Cancelar", use_container_width=True)
                             if salvar_ce:
                                 atualizar_chamado(raw_idx, {
                                     "Tipo": tipo_e, "Chave": chave_e, "Resumo": resumo_e,
@@ -854,7 +1172,7 @@ with tab_chamados:
                                     "Situação": sit_e, "Onde Impacta": impacta_e, "Obs": obs_e,
                                 })
                                 st.session_state["cham_edit_idx"] = None
-                                st.toast("Chamado atualizado!", icon="✅")
+                                st.toast("Chamado atualizado!")
                                 st.rerun()
                             if cancelar_ce:
                                 st.session_state["cham_edit_idx"] = None
@@ -885,13 +1203,13 @@ with tab_chamados:
                         # Botões de ação (sem excluir)
                         ba1, ba2 = st.columns(2)
 
-                        if ba1.button("📝 Obs / Atualizar", key=f"obs_btn_{raw_idx}", use_container_width=True):
+                        if ba1.button("Obs / Atualizar", key=f"obs_btn_{raw_idx}", use_container_width=True):
                             st.session_state["cham_obs_idx"]  = raw_idx
                             st.session_state["cham_edit_idx"] = None
                             st.session_state["cham_del_idx"]  = None
                             st.rerun()
 
-                        if ba2.button("✏️ Editar", key=f"edit_cham_{raw_idx}", use_container_width=True):
+                        if ba2.button("Editar", key=f"edit_cham_{raw_idx}", use_container_width=True):
                             st.session_state["cham_edit_idx"] = raw_idx
                             st.session_state["cham_obs_idx"]  = None
                             st.session_state["cham_del_idx"]  = None
@@ -900,20 +1218,20 @@ with tab_chamados:
                     # ── Painel de nova observação (fora do else para aparecer junto) ──
                     if st.session_state["cham_obs_idx"] == raw_idx and st.session_state["cham_edit_idx"] != raw_idx:
                         st.divider()
-                        st.markdown("##### 📝 Adicionar Observação")
+                        st.markdown("##### Adicionar Observação")
                         obs_atual_txt = str(row.get("Obs","")) if str(row.get("Obs","")) not in ("nan","") else ""
                         with st.form(f"form_obs_{raw_idx}"):
                             data_obs  = st.text_input("Data (ex: 24/03/2026)", value=date.today().strftime("%d/%m/%Y"))
                             nova_obs  = st.text_area("Observação *", height=90, placeholder="Descreva a atualização...")
                             op1, op2  = st.columns(2)
-                            salvar_o  = op1.form_submit_button("💾 Salvar Obs", type="primary", use_container_width=True)
-                            cancelar_o= op2.form_submit_button("❌ Cancelar", use_container_width=True)
+                            salvar_o  = op1.form_submit_button("Salvar observação", type="primary", use_container_width=True)
+                            cancelar_o= op2.form_submit_button("Cancelar", use_container_width=True)
                             if salvar_o and nova_obs.strip():
                                 separador = "\n\n---\n" if obs_atual_txt else ""
                                 obs_nova_completa = f"{obs_atual_txt}{separador}[{data_obs}] {nova_obs.strip()}"
                                 atualizar_chamado(raw_idx, {"Obs": obs_nova_completa})
                                 st.session_state["cham_obs_idx"] = None
-                                st.toast("Observação adicionada!", icon="📝")
+                                st.toast("Observação adicionada!")
                                 st.rerun()
                             if cancelar_o:
                                 st.session_state["cham_obs_idx"] = None
@@ -935,8 +1253,8 @@ with tab_chamados:
             impacta_n   = st.text_input("Onde Impacta", placeholder="Ex: Central de Cobrança, Sistema X, NCS...")
             obs_n       = st.text_area("Observações", placeholder="Detalhes, histórico, ações tomadas...", height=100)
 
-            st.form_submit_button_label = "✅ Cadastrar Chamado"
-            enviado_cham = st.form_submit_button("✅ Cadastrar Chamado", use_container_width=True, type="primary")
+            st.form_submit_button_label = "Cadastrar Chamado"
+            enviado_cham = st.form_submit_button("Cadastrar Chamado", use_container_width=True, type="primary")
 
             if enviado_cham:
                 if not tipo_n or not chave_n or not resumo_n or not solic_n:
@@ -948,11 +1266,98 @@ with tab_chamados:
                         "Solicitante": solic_n, "Criado": criado_n, "Fechado": fechado_n,
                         "Situação": sit_n, "Onde Impacta": impacta_n, "Obs": obs_n,
                     })
-                    st.success(f"✅ Chamado **{chave_n}** cadastrado!")
+                    st.success(f"Chamado **{chave_n}** cadastrado.")
                     st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 7 — IA DO TI (mantida sem alterações)
 # ══════════════════════════════════════════════════════════════════════════════
+with tab_noticia:
+    st.markdown(
+        """
+        <div class="news-hero">
+            <div class="news-kicker">Portal editorial</div>
+            <div class="news-title">Notícia</div>
+            <p class="news-subtitle">
+                Panorama contínuo com foco em tecnologia, liderança, transformação digital e leitura de mercado.
+                A curadoria combina fontes editoriais globais com indicadores oficiais do Banco Central do Brasil.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("#### Tecnologia e gestão")
+    colunas_fontes = st.columns(len(FONTES_TECNOLOGIA))
+    for coluna, fonte in zip(colunas_fontes, FONTES_TECNOLOGIA):
+        try:
+            noticias = carregar_feed_rss(fonte["url"], limite=3)
+        except Exception:
+            noticias = []
+
+        with coluna:
+            html_card = [f'<div class="news-card"><div class="news-source">{fonte["nome"]}</div>']
+            if noticias:
+                for noticia in noticias:
+                    resumo = noticia["resumo"] if noticia["resumo"] else "Clique para abrir a matéria completa."
+                    meta = noticia["data"] if noticia["data"] else "Atualização recente"
+                    html_card.append(
+                        f"""
+                        <div class="news-item">
+                            <a href="{noticia['link']}" target="_blank">{noticia['titulo']}</a>
+                            <div class="news-meta">{meta}</div>
+                            <p class="news-summary">{resumo}</p>
+                        </div>
+                        """
+                    )
+            else:
+                html_card.append(
+                    f"""
+                    <div class="source-fallback">
+                        <h4>{fonte['nome']}</h4>
+                        <p>O feed não respondeu neste momento. Acesse o portal oficial para acompanhar a cobertura completa.</p>
+                    </div>
+                    """
+                )
+            html_card.append(
+                f'<div class="news-item"><a href="{fonte["site"]}" target="_blank">Abrir portal</a></div></div>'
+            )
+            st.markdown("".join(html_card), unsafe_allow_html=True)
+
+    st.divider()
+    st.markdown("#### Mercado financeiro com base no Banco Central")
+    st.caption("Indicadores oficiais obtidos pelas APIs públicas do Banco Central do Brasil e PTAX.")
+
+    colunas_mercado = st.columns(4)
+    for coluna, indicador in zip(colunas_mercado, carregar_indicadores_bcb()):
+        with coluna:
+            st.markdown(
+                f"""
+                <div class="market-card">
+                    <h4>{indicador['nome']}</h4>
+                    <div class="market-value">{indicador['valor']}</div>
+                    <p class="market-meta">{indicador['descricao']}</p>
+                    <p class="market-meta">{indicador['data']}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("#### Fontes institucionais")
+    fontes_inst_cols = st.columns(len(FONTES_INSTITUCIONAIS))
+    for coluna, fonte in zip(fontes_inst_cols, FONTES_INSTITUCIONAIS):
+        with coluna:
+            st.markdown(
+                f"""
+                <div class="source-fallback">
+                    <h4>{fonte['nome']}</h4>
+                    <p>{fonte['descricao']}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if fonte.get("site"):
+                st.link_button(f"Acessar {fonte['nome']}", fonte["site"], use_container_width=True)
+
 with tab_ia:
     st.info("IA do TI — em breve.")
