@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, datetime, timedelta
-from html import unescape
+from html import escape, unescape
 import json
 import re
 import urllib.request
@@ -25,6 +25,10 @@ def _limpar_html(texto):
     texto = re.sub(r"<[^>]+>", " ", str(texto))
     texto = re.sub(r"\s+", " ", unescape(texto)).strip()
     return texto
+
+
+def _texto_seguro_html(texto):
+    return escape(str(texto or ""), quote=True)
 
 
 def _formatar_data_feed(valor):
@@ -368,6 +372,7 @@ st.markdown("""
         border-radius: 16px;
         padding: 1rem 1.1rem;
         margin-top: 0.5rem;
+        min-height: 128px;
     }
     .source-fallback h4 {
         margin: 0 0 0.35rem 0;
@@ -1299,12 +1304,16 @@ with tab_noticia:
             html_card = [f'<div class="news-card"><div class="news-source">{fonte["nome"]}</div>']
             if noticias:
                 for noticia in noticias:
-                    resumo = noticia["resumo"] if noticia["resumo"] else "Clique para abrir a matéria completa."
-                    meta = noticia["data"] if noticia["data"] else "Atualização recente"
+                    resumo = _texto_seguro_html(
+                        noticia["resumo"] if noticia["resumo"] else "Clique para abrir a matéria completa."
+                    )
+                    meta = _texto_seguro_html(noticia["data"] if noticia["data"] else "Atualização recente")
+                    titulo = _texto_seguro_html(noticia["titulo"])
+                    link = _texto_seguro_html(noticia["link"])
                     html_card.append(
                         f"""
                         <div class="news-item">
-                            <a href="{noticia['link']}" target="_blank">{noticia['titulo']}</a>
+                            <a href="{link}" target="_blank">{titulo}</a>
                             <div class="news-meta">{meta}</div>
                             <p class="news-summary">{resumo}</p>
                         </div>
@@ -1320,7 +1329,7 @@ with tab_noticia:
                     """
                 )
             html_card.append(
-                f'<div class="news-item"><a href="{fonte["site"]}" target="_blank">Abrir portal</a></div></div>'
+                f'<div class="news-item"><a href="{_texto_seguro_html(fonte["site"])}" target="_blank">Abrir portal</a></div></div>'
             )
             st.markdown("".join(html_card), unsafe_allow_html=True)
 
